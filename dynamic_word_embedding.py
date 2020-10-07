@@ -18,8 +18,8 @@ from collections import deque, Counter
 import torch
 
 # Import Custom Modules 
-from dynamic_bernoulli_embeddings.training import train_model # From 'https://github.com/llefebure/dynamic_bernoulli_embeddings'
-from utils import CustomError, dataframe_make
+from dynamic_word_embedding.training import train_model # From 'https://github.com/llefebure/dynamic_bernoulli_embeddings'
+from dynamic_word_embedding.utils import CustomError, dataframe_make
 
 def main(args):
 
@@ -40,12 +40,13 @@ def main(args):
             total_counter_korean = Counter()
         else:
             for_parsing_list = list()
+            record_korean_for_spm = list()
         comment_list_korean = list()
     king_list = list()
     king_index_list = list()
 
     # Data parsing & processing
-    for ix, path in enumerate(tqdm(data_path)):
+    for ix, path in enumerate(tqdm(AJD_data_path)):
         with open(path, 'r') as f:
             record_list = json.load(f)
             king_list.append(path.split(' ')[-1][:2])
@@ -56,7 +57,6 @@ def main(args):
                 record_hanja = list()
             if args.Korean_dwe:
                 record_korean = list()
-                record_korean_for_spm = list()
 
             # Data appending
             for rc in record_list:
@@ -64,6 +64,7 @@ def main(args):
                     record_hanja.append(rc['hanja'])
                 if args.Korean_dwe:
                     record_korean.append(rc['korean'])
+                    record_korean_for_spm.append(rc['korean'])
 
             # Hanja processing
             if args.Hanja_dwe:
@@ -98,7 +99,7 @@ def main(args):
         else:
             # 1) Make Korean text to train vocab
             with open(f'{args.save_path}/korean.txt', 'w') as f:
-                for korean in record_korean:
+                for korean in record_korean_for_spm:
                     f.write(f'{korean}\n')
 
             # 2) SentencePiece model training
@@ -147,10 +148,12 @@ def main(args):
         korean_dictionary.compactify()
 
     # Model training
+    print('Hanja dynamic word embedding training...')
     if args.Hanja_dwe:
         hanja_model, hanja_loss_history = train_model(hanja_dataset, hanja_word2id, validation=None, m=args.minibatch_iteration,
                                                       num_epochs=args.num_epochs, notebook=False)
 
+    print('Korean dynamic word embedding training...')
     if args.Korean_dwe:
         korean_model, korean_loss_history = train_model(korean_dataset, korean_word2id, validation=None, m=args.minibatch_iteration,
                                                         num_epochs=args.num_epochs, notebook=False)
@@ -165,10 +168,10 @@ def main(args):
     # Embedding vector saving
     if args.Hanja_dwe:
         with open(os.path.join(args.save_path, 'hj_emb_mat.pkl'), 'wb') as f:
-            pickle.dump(model.get_embeddings(), f)
+            pickle.dump(hanja_model.get_embeddings(), f)
     if args.Korean_dwe:
         with open(os.path.join(args.save_path, 'kr_emb_mat.pkl'), 'wb') as f:
-            pickle.dump(model.get_embeddings(), f)
+            pickle.dump(korean_model.get_embeddings(), f)
 
     # Pre-processed results saving
     if args.Hanja_dwe:
@@ -190,12 +193,13 @@ def main(args):
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description='DWE argparser')
     # Language select
-    parser.add_argument('--Hanja_dwe', type=bool, default=True, help='The number of epoch')
-    parser.add_argument('--Korean_dwe', type=bool, default=True, help='The number of epoch')
+    parser.add_argument('--Hanja_dwe', type=bool, default=True, help='Hanja processing')
+    parser.add_argument('--Korean_dwe', type=bool, default=True, help='Korean processing')
+    parser.add_argument('--Korean_khaiii', type=bool, default=False)
     # Path setting
-    parser.add_argument('--data_path', type=str, default='../data', 
+    parser.add_argument('--ADJ_data_path', type=str, default='./data', 
                         help='Data path setting')
-    parser.add_argument('--save_path', type=str, default='../preprocessing',
+    parser.add_argument('--save_path', type=str, default='./preprocessing',
                         help='Save path setting')
     # Training setting
     parser.add_argument('--num_epochs', type=int, default=5, help='The number of epoch')
