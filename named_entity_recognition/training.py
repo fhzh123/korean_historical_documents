@@ -8,7 +8,6 @@ import itertools
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-
 from sklearn.metrics import f1_score
 
 # Import PyTorch
@@ -20,11 +19,11 @@ from torch import optim
 from torch.utils.data import DataLoader
 
 # Import Custom Module
-from named_entity_recognition.dataset import CustomDataset, PadCollate
-from named_entity_recognition.model import NER_model
-from translation.optimizer import Ralamb, WarmupLinearSchedule
+from .dataset import CustomDataset, PadCollate
+from .model import NER_model
+from .optimizer import Ralamb, WarmupLinearSchedule
 
-def main(args):
+def training(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     #===================================#
@@ -35,16 +34,19 @@ def main(args):
     with open(os.path.join(args.save_path, 'ner_processed.pkl'), 'rb') as f:
         data_ = pickle.load(f)
         hj_train_indices = data_['hj_train_indices']
+        hj_valid_indices = data_['hj_valid_indices']
         hj_test_indices = data_['hj_test_indices']
         ner_train_indices = data_['ner_train_indices']
+        ner_valid_indices = data_['ner_valid_indices']
         ner_test_indices = data_['ner_test_indices']
         king_train_indices = data_['king_train_indices']
+        king_valid_indices = data_['king_valid_indices']
         king_test_indices = data_['king_test_indices']
-        id2word = data_['id2word']
-        word2id = data_['word2id']
+        word2id = data_['hj_word2id']
+        id2word = data_['hj_word2id']
         del data_
 
-    with open(os.path.join(args.save_path, 'emb_mat.pkl'), 'rb') as f:
+    with open(os.path.join(args.save_path, 'hj_emb_mat.pkl'), 'rb') as f:
         emb_mat = pickle.load(f)
 
     dataset_dict = {

@@ -11,7 +11,7 @@ from tqdm import tqdm
 # Import Custom Modules
 from utils import terminal_size, train_test_split
 
-def main(args):
+def preprocessing(args):
     #===================================#
     #============Data Load==============#
     #===================================#
@@ -19,7 +19,7 @@ def main(args):
     print('#'*terminal_size())
     print('Total list making...')
     # 1) Path setting
-    data_list = glob(os.path.join(args.data_path, '*/*.json'))
+    data_list = glob(os.path.join(args.ADJ_data_path, '*/*.json'))
     data_list = sorted(data_list)[:-1] # 순종부록 제거
 
     total_string_list = list()
@@ -57,6 +57,7 @@ def main(args):
 
     print('Paired data num:')
     print(f"train: {len(split_string_record['train'])}")
+    print(f"valid: {len(split_string_record['valid'])}")
     print(f"test: {len(split_string_record['test'])}")
 
     #====================================#
@@ -64,90 +65,48 @@ def main(args):
     #====================================#
 
     with open(os.path.join(args.save_path, 'hj_word2id.pkl'), 'rb') as f:
-        word2id = pickle.load(f)
+        hj_word2id = pickle.load(f)['hanja_word2id']
 
     #===================================#
     #=======Hanja Pre-processing========#
     #===================================#
 
-    # 1) Hanja sentence parsing setting
     print('Hanja sentence parsing...')
     start_time = time.time()
-    hj_parsed_indices_train = list()
-    hj_parsed_indices_test = list()
 
-    # 2) Parsing sentence
-    # 2-1) Train data parsing
+    # 1) Train data parsing (From utils.py)
     print('Train data start...')
-    for index in tqdm(split_string_record['train']):
-        parsed_index = list()
-        parsed_index.append(args.bos_idx) # Start token add
-        for ind in index:
-            try:
-                parsed_index.append(word2id[ind])
-            except KeyError:
-                parsed_index.append(word2id['<unk>'])
-        parsed_index.append(args.eos_idx) # End token add
-        hj_parsed_indices_train.append(parsed_index)
+    encode_to_ids(split_string_record['train'], hj_word2id, args)
 
-    # 2-2) Test data parsing
+    # 2) Valid data parsing
+    print('Valid data start...')
+    encode_to_ids(split_string_record['valid'], hj_word2id, args)
+
+    # 3) Test data parsing
     print('Test data start...')
-    for index in tqdm(split_string_record['test']):
-        parsed_index = list()
-        parsed_index.append(args.bos_idx) # Start token add
-        for ind in index:
-            try:
-                parsed_index.append(word2id[ind])
-            except KeyError:
-                parsed_index.append(word2id['<unk>'])
-        parsed_index.append(args.eos_idx) # End token add
-        hj_parsed_indices_test.append(parsed_index)
+    encode_to_ids(split_string_record['valid'], hj_word2id, args)
+
     print(f'Done! ; {round((time.time()-start_time)/60, 3)}min spend')
 
     #===================================#
     #========NER Pre-processing=========#
     #===================================#
 
-    # 1) NER parsing setting
     print('NER parsing...')
     start_time = time.time()
-    NER_label2id = {
-        'O': 0,
-        'B_PS': 1,
-        'I_PS': 2,
-        'B_LC': 3,
-        'I_LC': 4,
-        'B_BK': 5,
-        'I_BK': 6,
-        'B_BOOK': 5,
-        'I_BOOK': 6,
-        'B_ERA': 7,
-        'I_ERA': 8
-    }
-    NER_id2label = {v: k for k, v in NER_label2id.items()}
-    ner_indices_train = list()
-    ner_indices_test = list()
 
-    # 2) Parsing sentence
-    # 2-1) Train data parsing
+    # 1) Parsing sentence
     print('Train data start...')
-    for index in tqdm(split_ner_record['train']):
-        parsed_index = list()
-        parsed_index.append(0) # Start token add
-        for ind in index:
-            parsed_index.append(NER_label2id[ind])
-        parsed_index.append(0) # End token add
-        ner_indices_train.append(parsed_index)
+    ner_indices_train = ner_encode(split_ner_record['train'])
 
-    # 2-2) Test data parsing
+    # 2) Test data parsing
     print('Test data start...')
-    for index in tqdm(split_ner_record['test']):
-        parsed_index = list()
-        parsed_index.append(0) # Start token add
-        for ind in index:
-            parsed_index.append(NER_label2id[ind])
-        parsed_index.append(0) # End token add
-        ner_indices_test.append(parsed_index)
+    ner_indices_valid = ner_encode(split_ner_record['valid'])
+
+    # 3) Test data parsing
+    print('Test data start...')
+    ner_indices_test = ner_encode(split_ner_record['test'])
+
     print(f'Done! ; {round((time.time()-start_time)/60, 3)}min spend')
 
     #===================================#
@@ -165,26 +124,8 @@ def main(args):
             'ner_test_indices': ner_indices_test,
             'king_train_indices': split_king_record['train'],
             'king_test_indices': split_king_record['test'],
-            'word2id': word2id,
-            'id2word': {v: k for k, v in word2id.items()}
+            'hj_word2id': hj_word2id,
+            'hj_id2word': {v: k for k, v in hj_word2id.items()}
         }, f)
 
     print(f'Done! ; {round((time.time()-start_time)/60, 3)}min spend')
-
-if __name__=='__main__':
-    parser = argparse.ArgumentParser(description='Parsing Method')
-    parser.add_argument('--max_len', default=150, type=int)
-    parser.add_argument('--save_path', default='./save/', 
-                        type=str)
-    parser.add_argument('--data_path', default='../joseon_word_embedding/Crawl/crawledResults_NER', 
-                        type=str, help='Crawling data path')
-    parser.add_argument('--data_split_per', default=0.2, type=float,
-                        help='Train / Validation split ratio')
-    parser.add_argument('--pad_idx', default=0, type=int, help='Padding index')
-    parser.add_argument('--bos_idx', default=1, type=int, help='Start token index')
-    parser.add_argument('--eos_idx', default=2, type=int, help='End token index')
-    parser.add_argument('--unk_idx', default=3, type=int, help='Unknown token index')
-    args = parser.parse_args()
-
-    main(args)
-    print('All Done!')

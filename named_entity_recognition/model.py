@@ -9,7 +9,7 @@ from torch.nn.modules.activation import MultiheadAttention
 
 class NER_model(nn.Module):
     def __init__(self, emb_mat, word2id, pad_idx=0, bos_idx=1, eos_idx=2, max_len=150, d_model=512, d_embedding=256, n_head=8, 
-                 dim_feedforward=2048, n_layers=10, dropout=0.1, crf_loss=False, device=None):
+                 dim_feedforward=2048, n_layers=10, dropout=0.1, device=None):
         super(NER_model, self).__init__()
 
         self.pad_idx = pad_idx
@@ -19,12 +19,6 @@ class NER_model(nn.Module):
 
         self.dropout = nn.Dropout(dropout)
         self.device = device
-        self.crf_loss = crf_loss
-
-        # CRF_loss
-        if self.crf_loss:
-            self.crf = CRF(num_labels=9)
-            self.crf = self.crf.to(device)
 
         # Source embedding part
         # self.src_embedding = nn.Embedding(7559, d_model) # Need to fix number
@@ -70,7 +64,6 @@ class NER_model(nn.Module):
             return encoder_out2, loss
         else:
             return encoder_out2
-
 
 class TokenEmbedding(nn.Embedding):
     def __init__(self, vocab_size, embed_size=512, pad_idx=0):
