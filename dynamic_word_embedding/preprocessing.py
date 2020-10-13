@@ -33,7 +33,8 @@ def preprocessing(args):
         comment_list_hanja = list()
     if args.Korean_dwe:
         if args.Korean_khaiii:
-            total_counter_korean = Counter()
+            # total_counter_korean = Counter()
+            raise CustomError('Sorry; Will update soon!!')
         else:
             for_parsing_list = list()
             record_korean_for_spm = list()

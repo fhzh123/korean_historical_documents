@@ -9,7 +9,7 @@ from glob import glob
 from tqdm import tqdm
 
 # Import Custom Modules
-from utils import terminal_size, train_test_split
+from .utils import terminal_size, train_test_split, encode_to_ids, ner_encode
 
 def preprocessing(args):
     #===================================#
@@ -19,7 +19,7 @@ def preprocessing(args):
     print('#'*terminal_size())
     print('Total list making...')
     # 1) Path setting
-    data_list = glob(os.path.join(args.ADJ_data_path, '*/*.json'))
+    data_list = glob(os.path.join(args.ADJ_NER_path, '*/*.json'))
     data_list = sorted(data_list)[:-1] # 순종부록 제거
 
     total_string_list = list()
@@ -76,15 +76,15 @@ def preprocessing(args):
 
     # 1) Train data parsing (From utils.py)
     print('Train data start...')
-    encode_to_ids(split_string_record['train'], hj_word2id, args)
+    hj_parsed_indices_train = encode_to_ids(split_string_record['train'], hj_word2id, args)
 
     # 2) Valid data parsing
     print('Valid data start...')
-    encode_to_ids(split_string_record['valid'], hj_word2id, args)
+    hj_parsed_indices_valid = encode_to_ids(split_string_record['valid'], hj_word2id, args)
 
     # 3) Test data parsing
     print('Test data start...')
-    encode_to_ids(split_string_record['valid'], hj_word2id, args)
+    hj_parsed_indices_test = encode_to_ids(split_string_record['valid'], hj_word2id, args)
 
     print(f'Done! ; {round((time.time()-start_time)/60, 3)}min spend')
 
@@ -100,7 +100,7 @@ def preprocessing(args):
     ner_indices_train = ner_encode(split_ner_record['train'])
 
     # 2) Test data parsing
-    print('Test data start...')
+    print('Valid data start...')
     ner_indices_valid = ner_encode(split_ner_record['valid'])
 
     # 3) Test data parsing
@@ -119,10 +119,13 @@ def preprocessing(args):
     with open(os.path.join(args.save_path, 'ner_processed.pkl'), 'wb') as f:
         pickle.dump({
             'hj_train_indices': hj_parsed_indices_train,
+            'hj_valid_indices': hj_parsed_indices_valid,
             'hj_test_indices': hj_parsed_indices_test,
             'ner_train_indices': ner_indices_train,
+            'ner_valid_indices': ner_indices_valid,
             'ner_test_indices': ner_indices_test,
             'king_train_indices': split_king_record['train'],
+            'king_valid_indices': split_king_record['valid'],
             'king_test_indices': split_king_record['test'],
             'hj_word2id': hj_word2id,
             'hj_id2word': {v: k for k, v in hj_word2id.items()}

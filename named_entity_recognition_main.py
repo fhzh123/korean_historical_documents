@@ -1,6 +1,7 @@
 # Import modules
 import os
 import time
+import argparse
 
 # Import custom modules
 from named_entity_recognition.preprocessing import preprocessing
@@ -22,11 +23,11 @@ def main(args):
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description='Parsing Method')
-    parser.add_argument('--preprocessing', type=bool, default=True)
+    parser.add_argument('--preprocessing', action='store_true')
     # Path setting
     parser.add_argument('--save_path', default='./preprocessing', 
                         type=str)
-    parser.add_argument('--ADJ_data_path', default='./data', 
+    parser.add_argument('--ADJ_NER_path', default='./data/crawledResults_NER', 
                         type=str, help='Crawling data path')
     # Preprocessing setting
     parser.add_argument('--data_split_per', default=0.2, type=float,
@@ -40,7 +41,7 @@ if __name__=='__main__':
     # Training
     parser.add_argument('--num_epoch', type=int, default=10, help='Epoch count; Default is 10')
     parser.add_argument('--batch_size', type=int, default=48, help='Batch size; Default is 48')
-    parser.add_argument('--crf_loss', action='store_true')
+    parser.add_argument('--baseline', action='store_true')
     parser.add_argument('--lr', type=float, default=5e-5, help='Learning rate; Default is 5e-4')
     parser.add_argument('--lr_decay', type=float, default=0.5, help='Learning rate decay; Default is 0.5')
     parser.add_argument('--lr_decay_step', type=int, default=2, help='Learning rate decay step; Default is 5')

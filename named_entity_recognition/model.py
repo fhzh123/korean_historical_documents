@@ -8,30 +8,31 @@ from torch.nn import functional as F
 from torch.nn.modules.activation import MultiheadAttention
 
 class NER_model(nn.Module):
-    def __init__(self, emb_mat, word2id, pad_idx=0, bos_idx=1, eos_idx=2, max_len=150, d_model=512, d_embedding=256, n_head=8, 
-                 dim_feedforward=2048, n_layers=10, dropout=0.1, device=None):
+    def __init__(self, src_vocab_num, pad_idx=0, bos_idx=1, eos_idx=2, d_model=512, 
+                 d_embedding=256, n_head=8, dim_feedforward=2048, n_layers=10, dropout=0.1, 
+                 baseline=False, device=None):
         super(NER_model, self).__init__()
 
         self.pad_idx = pad_idx
         self.bos_idx = bos_idx
         self.eos_idx = eos_idx
-        self.max_len = max_len
 
         self.dropout = nn.Dropout(dropout)
-        self.device = device
 
         # Source embedding part
-        # self.src_embedding = nn.Embedding(7559, d_model) # Need to fix number
-        self.src_embedding = TransformerEmbedding(len(word2id.keys()), d_model, d_embedding, emb_mat, word2id)
+        if baseline:
+            self.src_embedding = nn.Embedding(src_vocab_num, d_model)
+        else:
+            self.src_embedding = TransformerEmbedding(src_vocab_num, d_model, d_embedding)
 
         # Transformer
-        # self_attn = MultiheadAttention(d_model, n_head, dropout=dropout)
-        # self.encoders = nn.ModuleList([
-        #     nn.TransformerEncoderLayer(d_model, self_attn, dim_feedforward,
-        #         activation='gelu', dropout=dropout) for i in range(n_layers)])
-        encoder_layers = nn.TransformerEncoderLayer(d_model=d_model, nhead=8, dim_feedforward=dim_feedforward, 
-                                                    dropout=dropout, activation='gelu')
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layers, n_layers)
+        self_attn = MultiheadAttention(d_model, n_head, dropout=dropout)
+        self.encoders = nn.ModuleList([
+            TransformerEncoderLayer(d_model, self_attn, dim_feedforward,
+                activation='gelu', dropout=dropout) for i in range(n_layers)])
+        # encoder_layers = nn.TransformerEncoderLayer(d_model=d_model, nhead=n_head, dim_feedforward=dim_feedforward, 
+        #                                             dropout=dropout, activation='gelu')
+        # self.transformer_encoder = nn.TransformerEncoder(encoder_layers, n_layers)
 
         # Output Linear Part
         self.src_output_linear = nn.Linear(d_model, d_embedding)
@@ -41,7 +42,6 @@ class NER_model(nn.Module):
         
     def init_weights(self):
         initrange = 0.1
-        # self.src_embedding.weight.data.uniform_(-initrange, initrange)
         self.src_output_linear.bias.data.zero_()
         self.src_output_linear.weight.data.uniform_(-initrange, initrange)
         self.src_output_linear2.bias.data.zero_()
@@ -49,40 +49,29 @@ class NER_model(nn.Module):
         
     def forward(self, sequence, king_id, trg=None):
         encoder_out = self.src_embedding(sequence, king_id).transpose(0, 1)
-        src_key_padding_mask = sequence == self.pad_idx
+        src_key_padding_mask = (sequence == self.pad_idx)
 
-        encoder_out = self.transformer_encoder(encoder_out, src_key_padding_mask=src_key_padding_mask)
+        # encoder_out = self.encoders(encoder_out, src_key_padding_mask=src_key_padding_mask)
+        for i in range(len(self.encoders)):
+            encoder_out = self.encoders[i](encoder_out, src_key_padding_mask=src_key_padding_mask)
 
-        encoder_out1 = self.dropout(F.gelu(self.src_output_linear(encoder_out)))
-        encoder_out2 = self.src_output_linear2(encoder_out1).transpose(0, 1)
-        # encoder_out2 = F.softmax(encoder_out2, dim=2)
-        if self.crf_loss:
-            mask = torch.where(sequence.cpu()!=0,torch.tensor(1),torch.tensor(0))
-            mask = torch.tensor(mask, dtype=torch.float).byte()
-            mask = mask.to(self.device)
-            loss = self.crf.forward(encoder_out2, trg, mask).sum()
-            return encoder_out2, loss
-        else:
-            return encoder_out2
+        encoder_out = encoder_out.transpose(0, 1)
+        encoder_out = self.dropout(F.gelu(self.src_output_linear(encoder_out)))
+        encoder_out = self.src_output_linear2(encoder_out)
+        encoder_out = F.softmax(encoder_out, dim=2)
+        return encoder_out
 
-class TokenEmbedding(nn.Embedding):
-    def __init__(self, vocab_size, embed_size=512, pad_idx=0):
-        super().__init__(vocab_size, embed_size, padding_idx=pad_idx)
+# class TokenEmbedding(nn.Embedding):
+#     def __init__(self, vocab_size, d_embedding=256, pad_idx=0):
+#         super().__init__(vocab_size, d_embedding, padding_idx=pad_idx)
 
 class TransformerEmbedding(nn.Module):
-    def __init__(self, vocab_size, d_model, embed_size, emb_mat, word2id, pad_idx=0, max_len=512):
+    def __init__(self, vocab_size, d_model, d_embedding, pad_idx=0):
         super().__init__()
         self.token_dict = dict()
-        for i in range(len(emb_mat)):
-            self.token_dict[i] = TokenEmbedding(vocab_size=vocab_size, embed_size=embed_size, pad_idx=0).cuda()
-            for word, id_ in word2id.items():
-                try:
-                    self.token_dict[i].token.weight.data[id_] = emb_mat[i][id_]
-                except:
-                    continue
         self.norm = nn.LayerNorm(d_model)
-        self.linear_layer = nn.Bilinear(embed_size, embed_size, d_model)
-        self.king_embedding = nn.Embedding(27, embed_size)
+        self.linear_layer = nn.Bilinear(d_embedding, d_embedding, d_model)
+        self.king_embedding = nn.Embedding(27, d_embedding)
     
     def forward(self, sequence, king_id):
         seq = torch.tensor([]).cuda()
@@ -90,3 +79,29 @@ class TransformerEmbedding(nn.Module):
             seq = torch.cat((seq, self.token_dict[king_.item()](sequence[i]).unsqueeze(0)), 0)
         x = self.linear_layer(seq, self.king_embedding(king_id).repeat(1, sequence.size(1), 1))
         return self.norm(x)
+
+class TransformerEncoderLayer(nn.Module):
+    def __init__(self, d_model, self_attn, dim_feedforward=2048, dropout=0.1, 
+            activation="relu"):
+        
+        super(TransformerEncoderLayer, self).__init__()
+        self.self_attn = self_attn
+        # Implementation of Feedforward model
+        self.linear1 = nn.Linear(d_model, dim_feedforward)
+        self.dropout = nn.Dropout(dropout)
+        self.linear2 = nn.Linear(dim_feedforward, d_model)
+
+        self.norm1 = nn.LayerNorm(d_model)
+        self.norm2 = nn.LayerNorm(d_model)
+        self.dropout1 = nn.Dropout(dropout)
+        self.dropout2 = nn.Dropout(dropout)
+
+    def forward(self, src, src_mask=None, src_key_padding_mask=None):
+        src2 = self.self_attn(src, src, src, attn_mask=src_mask,
+                              key_padding_mask=src_key_padding_mask)[0]
+        src = src + self.dropout1(src2)
+        src = self.norm1(src)
+        src2 = self.linear2(self.dropout(F.gelu(self.linear1(src))))
+        src = src + self.dropout2(src2)
+        src = self.norm2(src)
+        return src

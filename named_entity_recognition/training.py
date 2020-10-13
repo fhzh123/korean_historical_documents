@@ -6,9 +6,7 @@ import pickle
 import argparse
 import itertools
 import numpy as np
-import pandas as pd
 from tqdm import tqdm
-from sklearn.metrics import f1_score
 
 # Import PyTorch
 import torch
@@ -22,6 +20,7 @@ from torch.utils.data import DataLoader
 from .dataset import CustomDataset, PadCollate
 from .model import NER_model
 from .optimizer import Ralamb, WarmupLinearSchedule
+from .module import train_model
 
 def training(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -44,6 +43,7 @@ def training(args):
         king_test_indices = data_['king_test_indices']
         word2id = data_['hj_word2id']
         id2word = data_['hj_word2id']
+        src_vocab_num = len(word2id.keys())
         del data_
 
     with open(os.path.join(args.save_path, 'hj_emb_mat.pkl'), 'rb') as f:
@@ -68,10 +68,10 @@ def training(args):
     #===================================#
 
     print("Instantiating models...")
-    model = NER_model(emb_mat=emb_mat, word2id=word2id, pad_idx=args.pad_idx, bos_idx=args.bos_idx, eos_idx=args.eos_idx, max_len=args.max_len,
-                    d_model=args.d_model, d_embedding=args.d_embedding, n_head=args.n_head,
-                    dim_feedforward=args.dim_feedforward, n_layers=args.n_layers, dropout=args.dropout,
-                    crf_loss=args.crf_loss, device=device)
+    model = NER_model(src_vocab_num=src_vocab_num, pad_idx=args.pad_idx, bos_idx=args.bos_idx, 
+                      eos_idx=args.eos_idx, d_model=args.d_model, d_embedding=args.d_embedding, 
+                      n_head=args.n_head, dim_feedforward=args.dim_feedforward, n_layers=args.n_layers, 
+                      dropout=args.dropout, baseline=args.baseline, device=device)
     optimizer = optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr, weight_decay=args.w_decay)
     scheduler = WarmupLinearSchedule(optimizer, warmup_steps=len(dataloader_dict['train'])*3, 
                                      t_total=len(dataloader_dict['train'])*args.num_epoch)
@@ -79,119 +79,23 @@ def training(args):
     model.to(device)
 
     #===================================#
+    #============DWE setting============#
+    #===================================#
+
+    if not args.baseline:
+        for i in range(len(emb_mat)):
+            model.src_embedding.token_dict[i] = nn.Embedding(src_vocab_num, args.d_embedding, padding_idx=0).to(device)
+            for word, id_ in word2id.items():
+                try:
+                    model.src_embedding.token_dict[i].token.weight.data[id_] = emb_mat[i][id_]
+                except:
+                    continue
+
+    #===================================#
     #=========Model Train Start=========#
     #===================================#
 
-    best_val_f1 = None
-    total_train_loss_list = list()
-    total_test_loss_list = list()
-    freq = 0
-    for e in range(args.num_epoch):
-        start_time_e = time.time()
-        print(f'Model Fitting: [{e+1}/{args.num_epoch}]')
-        for phase in ['train', 'valid']:
-            if phase == 'train':
-                model.train()
-            if phase == 'valid':
-                model.eval()
-                val_f1 = 0
-                val_loss = 0
-            for src, trg, king_id in dataloader_dict[phase]:
-                # Sourcen, Target sentence setting
-                src = src.to(device)
-                trg = trg.to(device)
-                king_id = king_id.to(device)
-                
-                # Optimizer setting
-                optimizer.zero_grad()
-
-                # Model / Calculate loss
-                with torch.set_grad_enabled(phase == 'train'):
-                    if args.crf_loss:
-                        mask = torch.where(src.cpu()!=0,torch.tensor(1),torch.tensor(0))
-                        mask = torch.tensor(mask, dtype=torch.float).byte()
-                        mask = mask.to(device)
-                        output, loss = model(src, king_id, trg)
-                        loss = -loss
-                    else:
-                        output = model(src, king_id)
-                        output_flat = output.transpose(0,1)[1:].transpose(0,1).contiguous().view(-1, 9)
-                        trg_flat = trg.transpose(0,1)[1:].transpose(0,1).contiguous().view(-1)
-                        loss = criterion(output_flat, trg_flat)
-                    if phase == 'valid':
-                        val_loss += loss.item()
-                        if args.crf_loss:
-                            # Mask vector processing
-                            mask_ = list()
-                            for x_ in mask.tolist():
-                                mask_.append([1 if x==0 else x for x in x_])
-                            mask_ = torch.tensor(mask_).byte()
-                            output_list = model.crf.viterbi_decode(output, mask_)
-                            output_list = list(itertools.chain.from_iterable(output_list))
-                            real_list = trg.tolist()
-                            real_list = list(itertools.chain.from_iterable(real_list))
-                        else:
-                            output_list = output_flat.max(dim=1)[1].tolist()
-                            real_list = trg_flat.tolist()
-                        f1_val = f1_score(real_list, output_list, average='macro')
-                        val_f1 += f1_val
-                # If phase train, then backward loss and step optimizer and scheduler
-                if phase == 'train':
-                    loss.backward()
-                    optimizer.step()
-                    scheduler.step()
-                    total_train_loss_list.append(loss.item())
-
-                    # Print loss value only training
-                    freq += 1
-                    if freq == args.print_freq:
-                        total_loss = loss.item()
-                        if args.crf_loss:
-                            # Mask vector processing
-                            mask_ = list()
-                            for x_ in mask.tolist():
-                                mask_.append([1 if x==0 else x for x in x_])
-                            mask_ = torch.tensor(mask_).byte()
-                            output_list = model.crf.viterbi_decode(output, mask_)
-                            output_list = list(itertools.chain.from_iterable(output_list))
-                            real_list = trg.tolist()
-                            real_list = list(itertools.chain.from_iterable(real_list))
-                        else:
-                            output_list = output_flat.max(dim=1)[1].tolist()
-                            real_list = trg_flat.tolist()
-                        f1_ = f1_score(real_list, output_list, average='macro')
-                        if args.crf_loss:
-                            print("[Epoch:%d] val_loss:%5.3f | val_f1:%5.2f | spend_time:%5.2fmin"
-                                    % (e+1, total_loss, f1_, (time.time() - start_time_e) / 60))
-                        else:
-                            print("[Epoch:%d] val_loss:%5.3f | val_pp:%5.2fS | val_f1:%5.2f | spend_time:%5.2fmin"
-                                    % (e+1, total_loss, math.exp(total_loss), f1_, (time.time() - start_time_e) / 60))
-                        freq = 0
-
-            # Finishing iteration
-            if phase == 'valid':
-                val_loss /= len(dataloader_dict['valid'])
-                val_f1 /= len(dataloader_dict['valid'])
-                total_test_loss_list.append(val_loss)
-                if args.crf_loss:
-                    print("[Epoch:%d] val_loss:%5.3f | val_f1:%5.2f | spend_time:%5.2fmin"
-                            % (e+1, val_loss, val_f1, (time.time() - start_time_e) / 60))
-                else:
-                    print("[Epoch:%d] val_loss:%5.3f | val_pp:%5.2fS | val_f1:%5.2f | spend_time:%5.2fmin"
-                            % (e+1, val_loss, math.exp(val_loss), val_f1, (time.time() - start_time_e) / 60))
-                if not best_val_f1 or val_f1 > best_val_f1:
-                    print("[!] saving model...")
-                    if not os.path.exists(args.save_path):
-                        os.mkdir(args.save_path)
-                    torch.save(model.state_dict(), 
-                               os.path.join(args.save_path, f'ner_model_{args.crf_loss}.pt'))
-                    best_val_f1 = val_f1
-
-        # Learning rate scheduler setting
-        # scheduler.step()
-
-    pd.DataFrame(total_train_loss_list).to_csv(os.path.join(args.save_path, f'ner_train_loss_{args.crf_loss}.csv'), index=False)
-    pd.DataFrame(total_test_loss_list).to_csv(os.path.join(args.save_path, f'ner_test_loss_{args.crf_loss}.csv'), index=False)
+    train_model(args, model, dataloader_dict, optimizer, criterion, scheduler)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='NER argparser')
@@ -203,11 +107,10 @@ if __name__ == '__main__':
     parser.add_argument('--unk_idx', default=3, type=int, help='index of unk token')
 
     parser.add_argument('--min_len', type=int, default=4, help='Minimum Length of Sentences; Default is 4')
-    parser.add_argument('--max_len', type=int, default=150, help='Max Length of Source Sentence; Default is 150')
+    parser.add_argument('--max_len', type=int, default=200, help='Max Length of Source Sentence; Default is 150')
 
     parser.add_argument('--num_epoch', type=int, default=10, help='Epoch count; Default is 10')
     parser.add_argument('--batch_size', type=int, default=48, help='Batch size; Default is 48')
-    parser.add_argument('--crf_loss', action='store_true')
     parser.add_argument('--lr', type=float, default=5e-5, help='Learning rate; Default is 5e-4')
     parser.add_argument('--lr_decay', type=float, default=0.5, help='Learning rate decay; Default is 0.5')
     parser.add_argument('--lr_decay_step', type=int, default=2, help='Learning rate decay step; Default is 5')
@@ -220,6 +123,7 @@ if __name__ == '__main__':
     parser.add_argument('--dim_feedforward', type=int, default=2048, help='Embedding Vector Dimension; Default is 512')
     parser.add_argument('--n_layers', type=int, default=8, help='Model layers; Default is 8')
     parser.add_argument('--dropout', type=float, default=0.3, help='Dropout Ratio; Default is 0.5')
+    parser.add_argument('--baseline', action='store_true', help='Do not use bilinear embedding')
 
     parser.add_argument('--print_freq', type=int, default=300, help='Print train loss frequency; Default is 100')
     args = parser.parse_args()
