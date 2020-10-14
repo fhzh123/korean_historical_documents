@@ -86,8 +86,8 @@ def train_model(args, model, dataloader_dict, optimizer, criterion, scheduler):
                     if not os.path.exists(args.save_path):
                         os.mkdir(args.save_path)
                     torch.save(model.state_dict(), 
-                               os.path.join(args.save_path, f'ner_model.pt'))
+                               os.path.join(args.save_path, f'ner_model_{args.baseline}.pt'))
                     best_val_f1 = val_f1
 
-    pd.DataFrame(total_train_loss_list).to_csv(os.path.join(args.save_path, f'ner_train_loss.csv'), index=False)
-    pd.DataFrame(total_test_loss_list).to_csv(os.path.join(args.save_path, f'ner_test_loss.csv'), index=False)
+    pd.DataFrame(total_train_loss_list).to_csv(os.path.join(args.save_path, f'ner_train_loss_{args.baseline}.csv'), index=False)
+    pd.DataFrame(total_test_loss_list).to_csv(os.path.join(args.save_path, f'ner_test_loss_{args.baseline}.csv'), index=False)
