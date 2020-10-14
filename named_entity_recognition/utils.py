@@ -7,6 +7,8 @@ from tqdm import tqdm
 
 def train_test_split(record_list1, record_list2, record_list3, split_percent=0.2):
     assert len(record_list1) == len(record_list2) # Check paired data
+    assert len(record_list1) == len(record_list3) # Check paired data
+    assert len(record_list2) == len(record_list3) # Check paired data
 
     # Paired data split
     valid_ratio = split_percent / 2

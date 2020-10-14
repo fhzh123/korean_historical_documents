@@ -84,7 +84,7 @@ def preprocessing(args):
 
     # 3) Test data parsing
     print('Test data start...')
-    hj_parsed_indices_test = encode_to_ids(split_string_record['valid'], hj_word2id, args)
+    hj_parsed_indices_test = encode_to_ids(split_string_record['test'], hj_word2id, args)
 
     print(f'Done! ; {round((time.time()-start_time)/60, 3)}min spend')
 

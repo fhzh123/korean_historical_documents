@@ -1,6 +1,7 @@
 # Import modules
 import os
 import time
+import math
 import pandas as pd
 from sklearn.metrics import f1_score
 
@@ -14,8 +15,8 @@ def train_model(args, model, dataloader_dict, optimizer, criterion, scheduler):
     best_val_f1 = None
     total_train_loss_list = list()
     total_test_loss_list = list()
-    freq = 0
     for e in range(args.num_epoch):
+        freq = 0
         start_time_e = time.time()
         print(f'Model Fitting: [{e+1}/{args.num_epoch}]')
         for phase in ['train', 'valid']:
@@ -25,7 +26,7 @@ def train_model(args, model, dataloader_dict, optimizer, criterion, scheduler):
                 model.eval()
                 val_f1 = 0
                 val_loss = 0
-            for src, trg, king_id in dataloader_dict[phase]:
+            for i, (src, trg, king_id) in enumerate(dataloader_dict[phase]):
                 # Sourcen, Target sentence setting
                 src = src.to(device)
                 trg = trg.to(device)
@@ -39,7 +40,11 @@ def train_model(args, model, dataloader_dict, optimizer, criterion, scheduler):
                     output = model(src, king_id)
                     output_flat = output.transpose(0,1)[1:].transpose(0,1).contiguous().view(-1, 9)
                     trg_flat = trg.transpose(0,1)[1:].transpose(0,1).contiguous().view(-1)
-                    loss = criterion(output_flat, trg_flat)
+                    try:
+                        loss = criterion(output_flat, trg_flat)
+                    except ValueError:
+                        print(output_flat.size())
+                        print(trg_flat.size())
                     if phase == 'valid':
                         val_loss += loss.item()
                         output_list = output_flat.max(dim=1)[1].tolist()
@@ -55,13 +60,16 @@ def train_model(args, model, dataloader_dict, optimizer, criterion, scheduler):
 
                     # Print loss value only training
                     freq += 1
-                    if freq == args.print_freq:
+                    if freq == args.print_freq + 1:
                         total_loss = loss.item()
                         output_list = output_flat.max(dim=1)[1].tolist()
                         real_list = trg_flat.tolist()
                         f1_ = f1_score(real_list, output_list, average='macro')
-                        print("[Epoch:%d] val_loss:%5.3f | val_pp:%5.2fS | val_f1:%5.2f | spend_time:%5.2fmin"
-                                % (e+1, total_loss, math.exp(total_loss), f1_, (time.time() - start_time_e) / 60))
+                        print("[Epoch:%d][%d/%d] train_loss:%5.3f | train_pp:%5.3fS | train_f1:%5.2f | learning_rate:%3.8f | spend_time:%5.2fmin"
+                                % (e+1, i, len(dataloader_dict['train']), 
+                                total_loss, math.exp(total_loss), f1_, 
+                                optimizer.param_groups[0]['lr'], 
+                                (time.time() - start_time_e) / 60))
                         freq = 0
 
             # Finishing iteration
@@ -69,15 +77,17 @@ def train_model(args, model, dataloader_dict, optimizer, criterion, scheduler):
                 val_loss /= len(dataloader_dict['valid'])
                 val_f1 /= len(dataloader_dict['valid'])
                 total_test_loss_list.append(val_loss)
-                print("[Epoch:%d] val_loss:%5.3f | val_pp:%5.2fS | val_f1:%5.2f | spend_time:%5.2fmin"
-                        % (e+1, val_loss, math.exp(val_loss), val_f1, (time.time() - start_time_e) / 60))
+                print("[Epoch:%d]val_loss:%5.3f | val_pp:%5.2f | val_f1:%5.2f | learning_rate:%3.8f | spend_time:%5.2fmin"
+                        % (e+1, val_loss, 
+                        math.exp(val_loss), val_f1, optimizer.param_groups[0]['lr'], 
+                        (time.time() - start_time_e) / 60))
                 if not best_val_f1 or val_f1 > best_val_f1:
                     print("[!] saving model...")
                     if not os.path.exists(args.save_path):
                         os.mkdir(args.save_path)
                     torch.save(model.state_dict(), 
-                               os.path.join(args.save_path, f'ner_model_{args.crf_loss}.pt'))
+                               os.path.join(args.save_path, f'ner_model.pt'))
                     best_val_f1 = val_f1
 
-    pd.DataFrame(total_train_loss_list).to_csv(os.path.join(args.save_path, f'ner_train_loss_{args.crf_loss}.csv'), index=False)
-    pd.DataFrame(total_test_loss_list).to_csv(os.path.join(args.save_path, f'ner_test_loss_{args.crf_loss}.csv'), index=False)
+    pd.DataFrame(total_train_loss_list).to_csv(os.path.join(args.save_path, f'ner_train_loss.csv'), index=False)
+    pd.DataFrame(total_test_loss_list).to_csv(os.path.join(args.save_path, f'ner_test_loss.csv'), index=False)

@@ -16,8 +16,8 @@ class NER_model(nn.Module):
         self.pad_idx = pad_idx
         self.bos_idx = bos_idx
         self.eos_idx = eos_idx
-
         self.dropout = nn.Dropout(dropout)
+        self.baseline = baseline
 
         # Source embedding part
         if baseline:
@@ -48,7 +48,10 @@ class NER_model(nn.Module):
         self.src_output_linear2.weight.data.uniform_(-initrange, initrange)
         
     def forward(self, sequence, king_id, trg=None):
-        encoder_out = self.src_embedding(sequence, king_id).transpose(0, 1)
+        if self.baseline:
+            encoder_out = self.src_embedding(sequence).transpose(0, 1)
+        else:
+            encoder_out = self.src_embedding(sequence, king_id).transpose(0, 1)
         src_key_padding_mask = (sequence == self.pad_idx)
 
         # encoder_out = self.encoders(encoder_out, src_key_padding_mask=src_key_padding_mask)
