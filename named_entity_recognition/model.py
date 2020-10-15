@@ -32,10 +32,11 @@ class NER_model(nn.Module):
                 activation='gelu', dropout=dropout) for i in range(n_layers)])
         # encoder_layers = nn.TransformerEncoderLayer(d_model=d_model, nhead=n_head, dim_feedforward=dim_feedforward, 
         #                                             dropout=dropout, activation='gelu')
-        # self.transformer_encoder = nn.TransformerEncoder(encoder_layers, n_layers)
+        # self.encoders = nn.TransformerEncoder(encoder_layers, n_layers)
 
         # Output Linear Part
         self.src_output_linear = nn.Linear(d_model, d_embedding)
+        self.src_output_norm = nn.LayerNorm(d_embedding)
         self.src_output_linear2 = nn.Linear(d_embedding, 9)
         
         self.init_weights()
@@ -54,19 +55,15 @@ class NER_model(nn.Module):
             encoder_out = self.src_embedding(sequence, king_id).transpose(0, 1)
         src_key_padding_mask = (sequence == self.pad_idx)
 
-        # encoder_out = self.encoders(encoder_out, src_key_padding_mask=src_key_padding_mask)
+        encoder_out = self.encoders(encoder_out, src_key_padding_mask=src_key_padding_mask)
         for i in range(len(self.encoders)):
             encoder_out = self.encoders[i](encoder_out, src_key_padding_mask=src_key_padding_mask)
 
         encoder_out = encoder_out.transpose(0, 1)
-        encoder_out = self.dropout(F.gelu(self.src_output_linear(encoder_out)))
-        encoder_out = self.src_output_linear2(encoder_out)
-        encoder_out = F.softmax(encoder_out, dim=2)
+        encoder_out = self.src_output_norm(self.dropout(F.gelu(self.src_output_linear(encoder_out))))
+        encoder_out = self.src_output_linear2(mish(encoder_out))
+        # encoder_out = F.softmax(encoder_out, dim=2)
         return encoder_out
-
-# class TokenEmbedding(nn.Embedding):
-#     def __init__(self, vocab_size, d_embedding=256, pad_idx=0):
-#         super().__init__(vocab_size, d_embedding, padding_idx=pad_idx)
 
 class TransformerEmbedding(nn.Module):
     def __init__(self, vocab_size, d_model, d_embedding, pad_idx=0):
@@ -108,3 +105,6 @@ class TransformerEncoderLayer(nn.Module):
         src = src + self.dropout2(src2)
         src = self.norm2(src)
         return src
+
+def mish(x): 
+    return x * torch.tanh(F.softplus(x))

@@ -70,7 +70,7 @@ def train_model(args, model, dataloader_dict, optimizer, criterion, scheduler):
                                 total_loss, math.exp(total_loss), f1_, 
                                 optimizer.param_groups[0]['lr'], 
                                 (time.time() - start_time_e) / 60))
-                        freq = 0
+                        freq = -1
 
             # Finishing iteration
             if phase == 'valid':
