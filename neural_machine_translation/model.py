@@ -8,11 +8,10 @@ from .embedding.transformer_embedding import TransformerEmbedding, TransformerEm
 
 
 class Transformer(nn.Module):
-    def __init__(self, emb_mat_src, emb_mat_trg, src_word2id, trg_word2id, 
-            src_vocab_num, trg_vocab_num, pad_idx=0, bos_idx=1, 
+    def __init__(self, src_vocab_num, trg_vocab_num, pad_idx=0, bos_idx=1, 
             eos_idx=2, max_len=300, d_model=512, d_embedding=256, n_head=8, 
             dim_feedforward=2048, num_encoder_layer=8, num_decoder_layer=8, dropout=0.1,
-            baseline=False, device=None):
+            src_baseline=False, trg_baseline, device=None):
 
         super(Transformer, self).__init__()
 
@@ -29,14 +28,14 @@ class Transformer(nn.Module):
             self.src_embedding = TransformerEmbedding(src_vocab_num, d_model, d_embedding,
                                     pad_idx=self.pad_idx, max_len=self.max_len)
         else:
-            self.src_embedding = TransformerEmbedding_bilinear(len(src_word2id.keys()), 
+            self.src_embedding = TransformerEmbedding_with_bilinear(len(src_word2id.keys()), 
                 d_model, d_embedding, emb_mat_src, src_word2id)
         # Target embedding part
         if self.baseline:
             self.trg_embedding = TransformerEmbedding(trg_vocab_num, d_model, d_embedding,
                                     pad_idx=self.pad_idx, max_len=self.max_len)
         else:
-            self.trg_embedding = TransformerEmbedding_bilinear(len(trg_word2id.keys()), 
+            self.trg_embedding = TransformerEmbedding_with_bilinear(len(trg_word2id.keys()), 
                 d_model, d_embedding, emb_mat_trg, trg_word2id)
 
         self.trg_output_linear = nn.Linear(d_model, d_embedding)

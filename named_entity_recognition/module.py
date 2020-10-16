@@ -16,7 +16,6 @@ def train_model(args, model, dataloader_dict, optimizer, criterion, scheduler):
     total_train_loss_list = list()
     total_test_loss_list = list()
     for e in range(args.num_epoch):
-        freq = 0
         start_time_e = time.time()
         print(f'Model Fitting: [{e+1}/{args.num_epoch}]')
         for phase in ['train', 'valid']:
@@ -38,13 +37,9 @@ def train_model(args, model, dataloader_dict, optimizer, criterion, scheduler):
                 # Model / Calculate loss
                 with torch.set_grad_enabled(phase == 'train'):
                     output = model(src, king_id)
-                    output_flat = output.transpose(0,1)[1:].transpose(0,1).contiguous().view(-1, 9)
+                    output_flat = output.transpose(0,1)[1:].transpose(0,1).contiguous().view(-1, 10)
                     trg_flat = trg.transpose(0,1)[1:].transpose(0,1).contiguous().view(-1)
-                    try:
-                        loss = criterion(output_flat, trg_flat)
-                    except ValueError:
-                        print(output_flat.size())
-                        print(trg_flat.size())
+                    loss = criterion(output_flat, trg_flat)
                     if phase == 'valid':
                         val_loss += loss.item()
                         output_list = output_flat.max(dim=1)[1].tolist()
@@ -59,8 +54,7 @@ def train_model(args, model, dataloader_dict, optimizer, criterion, scheduler):
                     total_train_loss_list.append(loss.item())
 
                     # Print loss value only training
-                    freq += 1
-                    if freq == args.print_freq + 1:
+                    if i == 0 or freq == args.print_freq or i==len(dataloader_dict['train']):
                         total_loss = loss.item()
                         output_list = output_flat.max(dim=1)[1].tolist()
                         real_list = trg_flat.tolist()
@@ -70,7 +64,8 @@ def train_model(args, model, dataloader_dict, optimizer, criterion, scheduler):
                                 total_loss, math.exp(total_loss), f1_, 
                                 optimizer.param_groups[0]['lr'], 
                                 (time.time() - start_time_e) / 60))
-                        freq = -1
+                        freq = 0
+                    freq += 1
 
             # Finishing iteration
             if phase == 'valid':

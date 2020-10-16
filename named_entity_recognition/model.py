@@ -23,7 +23,7 @@ class NER_model(nn.Module):
         if baseline:
             self.src_embedding = nn.Embedding(src_vocab_num, d_model)
         else:
-            self.src_embedding = TransformerEmbedding(src_vocab_num, d_model, d_embedding)
+            self.src_embedding = TransformerEmbedding_with_bilinear(src_vocab_num, d_model, d_embedding)
 
         # Transformer
         self_attn = MultiheadAttention(d_model, n_head, dropout=dropout)
@@ -37,7 +37,7 @@ class NER_model(nn.Module):
         # Output Linear Part
         self.src_output_linear = nn.Linear(d_model, d_embedding)
         self.src_output_norm = nn.LayerNorm(d_embedding)
-        self.src_output_linear2 = nn.Linear(d_embedding, 9)
+        self.src_output_linear2 = nn.Linear(d_embedding, 10)
         
         self.init_weights()
         
@@ -55,7 +55,7 @@ class NER_model(nn.Module):
             encoder_out = self.src_embedding(sequence, king_id).transpose(0, 1)
         src_key_padding_mask = (sequence == self.pad_idx)
 
-        encoder_out = self.encoders(encoder_out, src_key_padding_mask=src_key_padding_mask)
+        # encoder_out = self.encoders(encoder_out, src_key_padding_mask=src_key_padding_mask)
         for i in range(len(self.encoders)):
             encoder_out = self.encoders[i](encoder_out, src_key_padding_mask=src_key_padding_mask)
 
@@ -74,17 +74,19 @@ class TransformerEmbedding(nn.Module):
         self.king_embedding = nn.Embedding(27, d_embedding)
     
     def forward(self, sequence, king_id):
-        seq = torch.tensor([]).cuda()
         for i, king_ in enumerate(king_id):
-            seq = torch.cat((seq, self.token_dict[king_.item()](sequence[i]).unsqueeze(0)), 0)
+            if i == 0:
+                seq = self.token_dict[king_.item()](sequence[i]).unsqueeze(0)
+            else:
+                seq = torch.cat((seq, self.token_dict[king_.item()](sequence[i]).unsqueeze(0)), 0)
         x = self.linear_layer(seq, self.king_embedding(king_id).repeat(1, sequence.size(1), 1))
         return self.norm(x)
 
-class TransformerEncoderLayer(nn.Module):
+class TransformerEmbedding_with_bilinear(nn.Module):
     def __init__(self, d_model, self_attn, dim_feedforward=2048, dropout=0.1, 
             activation="relu"):
         
-        super(TransformerEncoderLayer, self).__init__()
+        super(TransformerEmbedding_with_bilinear, self).__init__()
         self.self_attn = self_attn
         # Implementation of Feedforward model
         self.linear1 = nn.Linear(d_model, dim_feedforward)

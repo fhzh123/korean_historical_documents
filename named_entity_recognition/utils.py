@@ -70,17 +70,17 @@ def encode_to_ids(records_, word2id, args):
 def ner_encode(records_):
     # Setting
     NER_label2id = {
-        'O': 0,
-        'B_PS': 1,
-        'I_PS': 2,
-        'B_LC': 3,
-        'I_LC': 4,
-        'B_BK': 5,
-        'I_BK': 6,
-        'B_BOOK': 5,
-        'I_BOOK': 6,
-        'B_ERA': 7,
-        'I_ERA': 8
+        'O': 1,
+        'B_PS': 2,
+        'I_PS': 3,
+        'B_LC': 4,
+        'I_LC': 5,
+        'B_BK': 6,
+        'I_BK': 7,
+        'B_BOOK': 6,
+        'I_BOOK': 7,
+        'B_ERA': 8,
+        'I_ERA': 9
     }
     ner_indices = list()
     # Loop

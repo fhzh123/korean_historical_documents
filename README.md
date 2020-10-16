@@ -20,3 +20,7 @@ Korean historical documents analysis (Dynamic word embedding &amp; Named entity 
 ## 10/15
 
 * NER 성능 저하 문제 확인 -> 다양한 실험 중
+
+## 10/16
+
+* NER 및 NMT 내 Embedding 코드 수정 필요 (TransformerEmbedding_with_bilinear 및 baselin)
