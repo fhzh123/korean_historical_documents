@@ -18,7 +18,7 @@ class CustomDataset(Dataset):
         
     def __len__(self):
         return self.num_data
-    
+
 class PadCollate:
     def __init__(self, pad_index=0, dim=0, max_len=None):
         self.dim = dim

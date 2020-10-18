@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader
 
 # Import Custom Module
 from .dataset import CustomDataset, PadCollate
-from .model import NER_model
+from .model.transformer import Transformer_model
 from .optimizer import Ralamb, WarmupLinearSchedule
 from .module import train_model
 
@@ -68,10 +68,10 @@ def training(args):
     #===================================#
 
     print("Instantiating models...")
-    model = NER_model(src_vocab_num=src_vocab_num, pad_idx=args.pad_idx, bos_idx=args.bos_idx, 
-                      eos_idx=args.eos_idx, d_model=args.d_model, d_embedding=args.d_embedding, 
-                      n_head=args.n_head, dim_feedforward=args.dim_feedforward, n_layers=args.n_layers, 
-                      dropout=args.dropout, baseline=args.baseline, device=device)
+    model = Transformer_model(src_vocab_num=src_vocab_num, pad_idx=args.pad_idx, bos_idx=args.bos_idx, 
+                              eos_idx=args.eos_idx, d_model=args.d_model, d_embedding=args.d_embedding, 
+                              n_head=args.n_head, dim_feedforward=args.dim_feedforward, n_layers=args.n_layers, 
+                              dropout=args.dropout, baseline=args.baseline, device=device)
     optimizer = optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr, weight_decay=args.w_decay)
     scheduler = WarmupLinearSchedule(optimizer, warmup_steps=len(dataloader_dict['train'])*3, 
                                      t_total=len(dataloader_dict['train'])*args.num_epoch)

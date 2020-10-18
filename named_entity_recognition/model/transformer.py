@@ -7,11 +7,11 @@ from torch import nn
 from torch.nn import functional as F
 from torch.nn.modules.activation import MultiheadAttention
 
-class NER_model(nn.Module):
+class Transformer_model(nn.Module):
     def __init__(self, src_vocab_num, pad_idx=0, bos_idx=1, eos_idx=2, d_model=512, 
                  d_embedding=256, n_head=8, dim_feedforward=2048, n_layers=10, dropout=0.1, 
                  baseline=False, device=None):
-        super(NER_model, self).__init__()
+        super(Transformer_model, self).__init__()
 
         self.pad_idx = pad_idx
         self.bos_idx = bos_idx
@@ -82,11 +82,11 @@ class TransformerEmbedding(nn.Module):
         x = self.linear_layer(seq, self.king_embedding(king_id).repeat(1, sequence.size(1), 1))
         return self.norm(x)
 
-class TransformerEmbedding_with_bilinear(nn.Module):
+class TransformerEncoderLayer(nn.Module):
     def __init__(self, d_model, self_attn, dim_feedforward=2048, dropout=0.1, 
             activation="relu"):
         
-        super(TransformerEmbedding_with_bilinear, self).__init__()
+        super(TransformerEncoderLayer, self).__init__()
         self.self_attn = self_attn
         # Implementation of Feedforward model
         self.linear1 = nn.Linear(d_model, dim_feedforward)
