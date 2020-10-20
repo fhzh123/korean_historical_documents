@@ -67,28 +67,17 @@ def hj_encode_to_ids(records_, word2id, args):
         parsed_indices.append(parsed_index)
     return parsed_indices
 
-def ner_encode(records_):
-    # Setting
-    NER_label2id = {
-        'O': 1,
-        'B_PS': 2,
-        'I_PS': 3,
-        'B_LC': 4,
-        'I_LC': 5,
-        'B_BK': 6,
-        'I_BK': 7,
-        'B_BOOK': 6,
-        'I_BOOK': 7,
-        'B_ERA': 8,
-        'I_ERA': 9
-    }
-    ner_indices = list()
-    # Loop
-    for index in tqdm(records_):
-        parsed_index = list()
-        parsed_index.append(0) # Start token add
-        for ind in index:
-            parsed_index.append(NER_label2id[ind])
-        parsed_index.append(0) # End token add
-        ner_indices.append(parsed_index)
-    return ner_indices
+def accuracy(output, target, topk=(1,)):
+    """Computes the precision@k for the specified values of k"""
+    maxk = max(topk)
+    batch_size = target.size(0)
+
+    _, pred = output.topk(maxk, 1, True, True)
+    pred = pred.t()
+    correct = pred.eq(target.view(1, -1).expand_as(pred))
+
+    res = []
+    for k in topk:
+        correct_k = correct[:k].view(-1).float().sum(0)
+        res.append(correct_k.mul_(100.0 / batch_size))
+    return res

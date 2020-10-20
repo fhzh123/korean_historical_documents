@@ -1,0 +1,127 @@
+# Import Module
+import os
+import math
+import time
+import pickle
+import argparse
+import numpy as np
+import pandas as pd
+from tqdm import tqdm
+
+# Import PyTorch
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.nn.utils as torch_utils
+from torch import optim
+from torch.utils.data import DataLoader
+
+# Import Custom Module
+from .dataset import CustomDataset, PadCollate
+from .model.transformer import Transformer
+from .model.rnn import Encoder, Decoder, Seq2Seq
+from .optimizer import Ralamb, WarmupLinearSchedule
+from .training_module import train_model
+from .utils import accuracy
+
+def training(args):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    #===================================#
+    #============Data Load==============#
+    #===================================#
+
+    print('Data Load & Setting!')
+    with open(os.path.join(args.save_path, 'nmt_processed.pkl'), 'rb') as f:
+        data_ = pickle.load(f)
+        hj_train_indices = data_['hj_train_indices']
+        hj_valid_indices = data_['hj_valid_indices']
+        hj_test_indices = data_['hj_test_indices']
+        kr_train_indices = data_['kr_train_indices']
+        kr_valid_indices = data_['kr_valid_indices']
+        kr_test_indices = data_['kr_test_indices']
+        king_train_indices = data_['king_train_indices']
+        king_valid_indices = data_['king_valid_indices']
+        king_test_indices = data_['king_test_indices']
+        hj_word2id = data_['hj_word2id']
+        kr_word2id = data_['kr_word2id']
+        src_vocab_num = len(hj_word2id.keys())
+        trg_vocab_num = len(kr_word2id.keys())
+        del data_
+
+    # with open(os.path.join(args.save_path_kr, 'kr_word2id.pkl'), 'rb') as f:
+    #     kr_word2id = pickle.load(f)
+
+    #===================================#
+    #========DataLoader Setting=========#
+    #===================================#
+
+    dataset_dict = {
+        'train': CustomDataset(hj_train_indices, kr_train_indices, king_train_indices,
+                            min_len=args.min_len, max_len=args.max_len),
+        'valid': CustomDataset(hj_valid_indices, kr_valid_indices, king_valid_indices,
+                            min_len=args.min_len, max_len=args.max_len)
+    }
+    dataloader_dict = {
+        'train': DataLoader(dataset_dict['train'], collate_fn=PadCollate(), drop_last=True,
+                            batch_size=args.batch_size, shuffle=True, pin_memory=True),
+        'valid': DataLoader(dataset_dict['valid'], collate_fn=PadCollate(), drop_last=True,
+                            batch_size=args.batch_size, shuffle=True, pin_memory=True)
+    }
+
+    #====================================#
+    #==========DWE Results Open==========#
+    #====================================#
+
+    with open(os.path.join(args.save_path, 'hj_emb_mat.pkl'), 'rb') as f:
+        emb_mat_src = pickle.load(f)
+
+    # with open(os.path.join(args.save_path_kr, 'emb_mat.pkl'), 'rb') as f:
+    #     emb_mat_trg = pickle.load(f)
+
+    #===================================#
+    #===========Model Setting===========#
+    #===================================#
+
+    print("Build model")
+    if args.model_setting == 'transformer':
+        model = Transformer(src_vocab_num, trg_vocab_num, 
+                    pad_idx=args.pad_idx, bos_idx=args.bos_idx, eos_idx=args.eos_idx, 
+                    max_len=args.max_len, d_model=args.d_model, d_embedding=args.d_embedding, 
+                    n_head=args.n_head, dim_feedforward=args.dim_feedforward, dropout=args.dropout,
+                    num_encoder_layer=args.num_encoder_layer, num_decoder_layer=args.num_decoder_layer,
+                    src_baseline=args.src_baseline, trg_baseline=args.trg_baseline, device=device)
+    elif args.model_setting == 'rnn':
+        encoder = Encoder(src_vocab_num, args.d_embedding, args.d_model, 
+                        emb_mat_src, hj_word2id, n_layers=args.num_encoder_layer, 
+                        pad_idx=args.pad_idx, dropout=args.dropout)
+        decoder = Decoder(args.d_embedding, args.d_model, trg_vocab_num, n_layers=args.num_decoder_layer, 
+                        pad_idx=args.pad_idx, dropout=args.dropout)
+        model = Seq2Seq(encoder, decoder, device)
+    else:
+        raise Exception('Model error')
+
+    # if args.resume:
+    #     model_ner = NER_model(emb_mat=emb_mat, word2id=hj_word2id, pad_idx=args.pad_idx, bos_idx=args.bos_idx, eos_idx=args.eos_idx, max_len=args.max_len,
+    #                     d_model=args.d_model, d_embedding=args.d_embedding, n_head=args.n_head,
+    #                     dim_feedforward=args.dim_feedforward, n_layers=args.num_encoder_layer, dropout=args.dropout,
+    #                     device=device)
+    #     model_ner.load_state_dict(torch.load(os.path.join(args.save_path, 'ner_model_False.pt')))
+    #     model.transformer_encoder.load_state_dict(model_ner.transformer_encoder.state_dict())
+    #     for param in model.transformer_encoder.parameters():
+    #         param.requires_grad = False
+    # print("Total Parameters:", sum([p.nelement() for p in model.parameters()]))
+    print(f"Total number of trainingsets  iterations - {len(dataset_dict['train'])}, {len(dataloader_dict['train'])}")
+
+    optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.w_decay)
+    # scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.lr_decay_step, gamma=args.lr_decay)
+    scheduler = WarmupLinearSchedule(optimizer, warmup_steps=len(dataloader_dict['train'])*3, 
+                                     t_total=len(dataloader_dict['train'])*args.num_epoch)
+    criterion = nn.CrossEntropyLoss(ignore_index=args.pad_idx)
+    model.to(device)
+
+    #===================================#
+    #=========Model Train Start=========#
+    #===================================#
+
+    train_model(args, model, dataloader_dict, optimizer, criterion, scheduler, device)

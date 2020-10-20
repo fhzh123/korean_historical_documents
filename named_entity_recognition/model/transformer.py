@@ -1,11 +1,12 @@
-# coding: utf-8
+# Import modules
 import numpy as np
-from TorchCRF import CRF
-
+# Import PyTorch
 import torch
 from torch import nn
 from torch.nn import functional as F
 from torch.nn.modules.activation import MultiheadAttention
+# Import custom moduels
+from .embedding import token, transformer_embedding
 
 class Transformer_model(nn.Module):
     def __init__(self, src_vocab_num, pad_idx=0, bos_idx=1, eos_idx=2, d_model=512, 
@@ -64,23 +65,6 @@ class Transformer_model(nn.Module):
         encoder_out = self.src_output_linear2(mish(encoder_out))
         # encoder_out = F.softmax(encoder_out, dim=2)
         return encoder_out
-
-class TransformerEmbedding(nn.Module):
-    def __init__(self, vocab_size, d_model, d_embedding, pad_idx=0):
-        super().__init__()
-        self.token_dict = dict()
-        self.norm = nn.LayerNorm(d_model)
-        self.linear_layer = nn.Bilinear(d_embedding, d_embedding, d_model)
-        self.king_embedding = nn.Embedding(27, d_embedding)
-    
-    def forward(self, sequence, king_id):
-        for i, king_ in enumerate(king_id):
-            if i == 0:
-                seq = self.token_dict[king_.item()](sequence[i]).unsqueeze(0)
-            else:
-                seq = torch.cat((seq, self.token_dict[king_.item()](sequence[i]).unsqueeze(0)), 0)
-        x = self.linear_layer(seq, self.king_embedding(king_id).repeat(1, sequence.size(1), 1))
-        return self.norm(x)
 
 class TransformerEncoderLayer(nn.Module):
     def __init__(self, d_model, self_attn, dim_feedforward=2048, dropout=0.1, 

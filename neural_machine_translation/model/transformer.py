@@ -10,8 +10,8 @@ from .embedding.transformer_embedding import TransformerEmbedding, TransformerEm
 class Transformer(nn.Module):
     def __init__(self, src_vocab_num, trg_vocab_num, pad_idx=0, bos_idx=1, 
             eos_idx=2, max_len=300, d_model=512, d_embedding=256, n_head=8, 
-            dim_feedforward=2048, num_encoder_layer=8, num_decoder_layer=8, dropout=0.1,
-            src_baseline=False, trg_baseline, device=None):
+            dim_feedforward=2048, dropout=0.1, num_encoder_layer=8, num_decoder_layer=8,
+            src_baseline=False, trg_baseline=False, device=None):
 
         super(Transformer, self).__init__()
 
@@ -19,36 +19,37 @@ class Transformer(nn.Module):
         self.bos_idx = bos_idx
         self.eos_idx = eos_idx
         self.max_len = max_len
-        self.baseline = baseline
+        self.src_baseline = src_baseline
+        self.trg_baseline = trg_baseline
 
         self.dropout = nn.Dropout(dropout)
 
         # Source embedding part
-        if self.baseline:
+        if self.src_baseline:
             self.src_embedding = TransformerEmbedding(src_vocab_num, d_model, d_embedding,
                                     pad_idx=self.pad_idx, max_len=self.max_len)
         else:
-            self.src_embedding = TransformerEmbedding_with_bilinear(len(src_word2id.keys()), 
+            self.src_embedding = TransformerEmbedding_bilinear(len(src_word2id.keys()), 
                 d_model, d_embedding, emb_mat_src, src_word2id)
         # Target embedding part
-        if self.baseline:
+        if self.trg_baseline:
             self.trg_embedding = TransformerEmbedding(trg_vocab_num, d_model, d_embedding,
                                     pad_idx=self.pad_idx, max_len=self.max_len)
         else:
-            self.trg_embedding = TransformerEmbedding_with_bilinear(len(trg_word2id.keys()), 
+            self.trg_embedding = TransformerEmbedding_bilinear(len(trg_word2id.keys()), 
                 d_model, d_embedding, emb_mat_trg, trg_word2id)
 
         self.trg_output_linear = nn.Linear(d_model, d_embedding)
         self.trg_output_linear2 = nn.Linear(d_embedding, trg_vocab_num)
         
         # Transformer
-        # self_attn = MultiheadAttention(d_model, n_head, dropout=dropout)
-        # self.encoders = nn.ModuleList([
-        #     TransformerEncoderLayer(d_model, self_attn, dim_feedforward,
-        #         activation='gelu', dropout=dropout) for i in range(num_encoder_layer)])
-        encoder_layers = nn.TransformerEncoderLayer(d_model=d_model, nhead=n_head, dim_feedforward=dim_feedforward, 
-                                                    dropout=dropout, activation='gelu')
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layers, num_encoder_layer)
+        self_attn = MultiheadAttention(d_model, n_head, dropout=dropout)
+        self.encoders = nn.ModuleList([
+            TransformerEncoderLayer(d_model, self_attn, dim_feedforward,
+                activation='gelu', dropout=dropout) for i in range(num_encoder_layer)])
+        # encoder_layers = nn.TransformerEncoderLayer(d_model=d_model, nhead=n_head, dim_feedforward=dim_feedforward, 
+        #                                             dropout=dropout, activation='gelu')
+        # self.transformer_encoder = nn.TransformerEncoder(encoder_layers, num_encoder_layer)
 
         self_attn = MultiheadAttention(d_model, n_head, dropout=dropout)
         decoder_mask_attn = MultiheadAttention(d_model, n_head, dropout=dropout)
@@ -61,21 +62,35 @@ class Transformer(nn.Module):
         src_key_padding_mask = (src_input_sentence == self.pad_idx)
         tgt_key_padding_mask = (trg_input_sentence == self.pad_idx)
 
-        if self.baseline:
+        if self.src_baseline:
             encoder_out = self.src_embedding(src_input_sentence).transpose(0, 1)
         else:
             encoder_out = self.src_embedding(src_input_sentence, king_id).transpose(0, 1)
 
-        if self.baseline:
+        if self.trg_baseline:
             decoder_out = self.trg_embedding(trg_input_sentence).transpose(0, 1)
         else:
             decoder_out = self.trg_embedding(trg_input_sentence, king_id).transpose(0, 1)
 
+    #===================================#
+    #========Normal Transformer=========#
+    #===================================#
+
         # for i in range(len(self.encoders)):
         #     encoder_out = self.encoders[i](encoder_out, src_key_padding_mask=src_key_padding_mask)
-        encoder_out = self.transformer_encoder(encoder_out, src_key_padding_mask=src_key_padding_mask)
+        # # encoder_out = self.transformer_encoder(encoder_out, src_key_padding_mask=src_key_padding_mask)
 
-        for i in range(len(self.decoders)):            
+        # for i in range(len(self.decoders)):
+        #     decoder_out = self.decoders[i](decoder_out, encoder_out, tgt_mask=tgt_mask,
+        #                         memory_key_padding_mask=src_key_padding_mask,
+        #                         tgt_key_padding_mask=tgt_key_padding_mask)
+
+    #===================================#
+    #==========P-Transformer============#
+    #===================================#
+
+        for i in range(len(self.encoders)):
+            encoder_out = self.encoders[i](encoder_out, src_key_padding_mask=src_key_padding_mask)
             decoder_out = self.decoders[i](decoder_out, encoder_out, tgt_mask=tgt_mask,
                                 memory_key_padding_mask=src_key_padding_mask,
                                 tgt_key_padding_mask=tgt_key_padding_mask)
@@ -140,7 +155,6 @@ class TransformerEncoderLayer(nn.Module):
         src = src + self.dropout2(src2)
         src = self.norm2(src)
         return src
-
 
 class TransformerDecoderLayer(nn.Module):
 

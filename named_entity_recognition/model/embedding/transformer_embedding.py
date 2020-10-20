@@ -8,6 +8,8 @@ class TransformerEmbedding(nn.Module):
         self.norm = nn.LayerNorm(d_model)
         self.linear_layer = nn.Bilinear(d_embedding, d_embedding, d_model)
         self.king_embedding = nn.Embedding(27, d_embedding)
+        
+        self.position = PositionalEmbedding(d_model=embed_size, max_len=max_len)
 
     def forward(self, sequence, king_id):
         for i, king_ in enumerate(king_id):

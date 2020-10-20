@@ -20,7 +20,7 @@ from torch.utils.data import DataLoader
 from .dataset import CustomDataset, PadCollate
 from .model.transformer import Transformer_model
 from .optimizer import Ralamb, WarmupLinearSchedule
-from .module import train_model
+from .training_module import train_model
 
 def training(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

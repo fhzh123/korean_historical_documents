@@ -76,15 +76,15 @@ def preprocessing(args):
 
     # 1) Train data parsing (From utils.py)
     print('Train data start...')
-    hj_parsed_indices_train = encode_to_ids(split_string_record['train'], hj_word2id, args)
+    hj_parsed_indices_train = hj_encode_to_ids(split_string_record['train'], hj_word2id, args)
 
     # 2) Valid data parsing
     print('Valid data start...')
-    hj_parsed_indices_valid = encode_to_ids(split_string_record['valid'], hj_word2id, args)
+    hj_parsed_indices_valid = hj_encode_to_ids(split_string_record['valid'], hj_word2id, args)
 
     # 3) Test data parsing
     print('Test data start...')
-    hj_parsed_indices_test = encode_to_ids(split_string_record['test'], hj_word2id, args)
+    hj_parsed_indices_test = hj_encode_to_ids(split_string_record['test'], hj_word2id, args)
 
     print(f'Done! ; {round((time.time()-start_time)/60, 3)}min spend')
 
