@@ -27,8 +27,8 @@ def train_model(args, model, dataloader_dict, optimizer, criterion, scheduler, d
                 val_top10_acc = 0
             for i, (src, trg, king_id) in enumerate(dataloader_dict[phase]):
                 # Sourcen, Target sentence setting
-                label_sequences = trg.to(device, non_blocking=True)
                 input_sequences = src.to(device, non_blocking=True)
+                label_sequences = trg.to(device, non_blocking=True)
                 king_id = king_id.to(device, non_blocking=True)
 
                 non_pad = label_sequences != args.pad_idx
@@ -38,7 +38,8 @@ def train_model(args, model, dataloader_dict, optimizer, criterion, scheduler, d
                     # Target Masking
                     tgt_mask = model.generate_square_subsequent_mask(label_sequences.size(1))
                     tgt_mask = tgt_mask.to(device, non_blocking=True)
-                    tgt_mask = tgt_mask.transpose(0, 1)
+                    trg_sequences_target = label_sequences[:, 1:]
+                    # tgt_mask = tgt_mask.transpose(0, 1)
 
                 # Optimizer setting
                 optimizer.zero_grad()
@@ -46,7 +47,9 @@ def train_model(args, model, dataloader_dict, optimizer, criterion, scheduler, d
                 # Model / Calculate loss
                 with torch.set_grad_enabled(phase == 'train'):
                     if args.model_setting == 'transformer':
-                        predicted = model(input_sequences, label_sequences, king_id, tgt_mask, non_pad)
+                        predicted = model(input_sequences, trg_sequences_target[:, :-1], king_id, 
+                                          tgt_mask, non_pad)
+                        predicted = predicted.view(-1, predicted.size(-1))
                         loss = criterion(predicted, trg_sequences_target)
                     if args.model_setting == 'rnn':
                         teacher_forcing_ratio_ = 0.5
@@ -97,7 +100,7 @@ def train_model(args, model, dataloader_dict, optimizer, criterion, scheduler, d
                     if not os.path.exists(args.save_path):
                         os.mkdir(args.save_path)
                     torch.save(model.state_dict(), 
-                               os.path.join(args.save_path, f'nmt_model_{args.model_setting}_{args.resume}_{args.baseline}_testing2.pt'))
+                               os.path.join(args.save_path, f'nmt_model_{args.model_setting}_testing.pt'))
                     best_val_loss = val_loss
 
         # Learning rate scheduler setting

@@ -2,3 +2,4 @@ preprocessing/*
 data/*
 __pycache__
 .ipynb_checkpoints
+*.ipynb

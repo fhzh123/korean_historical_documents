@@ -103,30 +103,8 @@ class Transformer(nn.Module):
         decoder_out = self.trg_output_linear2(decoder_out)
         return decoder_out
 
-    def translate_predict(self, src_sentence, device):
-        if self.baseline:
-            encoder_out = self.src_embedding(src_input_sentence).transpose(0, 1)
-        else:
-            encoder_out = self.src_embedding(src_input_sentence, king_id).transpose(0, 1)
-        predicted = torch.LongTensor([[self.bos_idx]]).to(device)
-
-        for _ in range(self.max_len):
-            trg_embs = self.embedding(predicted).transpose(0, 1)
-            decoder_out = self.transformer(src_embs, trg_embs)
-            decoder_out = F.gelu(self.trg_output_linear(decoder_out))
-            y_pred = self.output_linear2(decoder_out).transpose(0, 1).contiguous()
-            y_pred_id = y_pred.max(dim=2)[1][-1, 0]
-
-            if y_pred_id == self.eos_idx:
-                break
-
-            predicted = torch.cat([predicted, y_pred_id.view(1, 1)], dim=0)
-            
-        predicted = predicted[1:, 0].cpu().numpy() # remove bos token
-        return predicted
-
     def generate_square_subsequent_mask(self, sz):
-        mask = (torch.triu(torch.ones(sz, sz)) == 1)
+        mask = (torch.triu(torch.ones(sz, sz, device='cuda')) == 1).transpose(0, 1)
         mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
         return mask
 

@@ -36,13 +36,10 @@ def training(args):
         data_ = pickle.load(f)
         hj_train_indices = data_['hj_train_indices']
         hj_valid_indices = data_['hj_valid_indices']
-        hj_test_indices = data_['hj_test_indices']
         kr_train_indices = data_['kr_train_indices']
         kr_valid_indices = data_['kr_valid_indices']
-        kr_test_indices = data_['kr_test_indices']
         king_train_indices = data_['king_train_indices']
         king_valid_indices = data_['king_valid_indices']
-        king_test_indices = data_['king_test_indices']
         hj_word2id = data_['hj_word2id']
         kr_word2id = data_['kr_word2id']
         src_vocab_num = len(hj_word2id.keys())

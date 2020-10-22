@@ -36,9 +36,8 @@ def preprocessing(args):
         data_trg_list = list()
         # 2-2) Extract string data by length
         for x in data_:
-            if len(x['hanja']) <= args.max_len:
-                data_src_list.append(x['hanja'])
-                data_trg_list.append(x['korean'])
+            data_src_list.append(x['hanja'])
+            data_trg_list.append(x['korean'])
         # 2-3) Total data setting
         total_src_list.extend(data_src_list)
         total_trg_list.extend(data_trg_list)
@@ -77,6 +76,17 @@ def preprocessing(args):
     hj_parsed_indices_test = list()
 
     # 2) Parsing sentence
+
+    word_counter = Counter()
+    hanja_word2id = ['<pad>', '<s>', '</s>', '<unk>']
+    # Hanja Counter
+    for sentence in split_src_record['train']:
+        for word in sentence:
+            word_counter.update(word)
+
+    hanja_word2id.extend([w for w, freq in word_counter.items() if freq >= 10])
+    hj_word2id = {w: i for i, w in enumerate(hanja_word2id)}
+
     # 2-1) Train data parsing
     # 1) Train data parsing (From utils.py)
 

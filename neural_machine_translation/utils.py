@@ -57,13 +57,13 @@ def hj_encode_to_ids(records_, word2id, args):
     # Loop
     for index in tqdm(records_):
         parsed_index = list()
-        parsed_index.append(args.bos_idx) # Start token add
+        parsed_index.append(word2id['<s>']) # Start token add
         for ind in index:
             try:
                 parsed_index.append(word2id[ind])
             except KeyError:
                 parsed_index.append(word2id['<unk>'])
-        parsed_index.append(args.eos_idx) # End token add
+        parsed_index.append(word2id['</s>']) # End token add
         parsed_indices.append(parsed_index)
     return parsed_indices
 
