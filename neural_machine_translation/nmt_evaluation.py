@@ -33,18 +33,31 @@ def main(args):
     #===================================#
 
     print('Data Load & Setting!')
-    with open(os.path.join(args.save_path, 'nmt_processed.pkl'), 'rb') as f:
-        data_ = pickle.load(f)
-        hj_test_indices = data_['hj_test_indices']
-        kr_test_indices = data_['kr_test_indices']
-        king_test_indices = data_['king_test_indices']
-        hj_word2id = data_['hj_word2id']
-        hj_id2word = data_['hj_id2word']
-        kr_word2id = data_['kr_word2id']
-        kr_id2word = data_['kr_id2word']
-        src_vocab_num = len(hj_word2id.keys())
-        trg_vocab_num = len(kr_word2id.keys())
-        del data_
+    if args.dataset == 'total_data':
+        with open(os.path.join(args.save_path, 'preprocessed_data.json'), 'r') as f:
+            data_ = pickle.load(f)
+            hj_test_indices = data_['test_hanja_indices']
+            kr_test_indices = data_['test_korean_indices']
+            king_test_indices = data_['king_ids_hk_test']
+            hj_word2id = data_['hanja_word2id']
+            kr_word2id = data_['korean_word2id']
+            src_vocab_num = len(src_word2id.keys())
+            trg_vocab_num = len(trg_word2id.keys())
+            del data_
+
+    elif args.dataset == 'normal_data':
+        with open(os.path.join(args.save_path, 'nmt_processed.pkl'), 'rb') as f:
+            data_ = pickle.load(f)
+            hj_test_indices = data_['hj_test_indices']
+            kr_test_indices = data_['kr_test_indices']
+            king_test_indices = data_['king_test_indices']
+            hj_word2id = data_['hj_word2id']
+            hj_id2word = data_['hj_id2word']
+            kr_word2id = data_['kr_word2id']
+            kr_id2word = data_['kr_id2word']
+            src_vocab_num = len(hj_word2id.keys())
+            trg_vocab_num = len(kr_word2id.keys())
+            del data_
 
     #===================================#
     #========DataLoader Setting=========#

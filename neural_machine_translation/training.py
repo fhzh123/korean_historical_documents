@@ -42,8 +42,8 @@ def training(args):
             kr_valid_indices = data_['valid_korean_indices']
             king_train_indices = data_['king_ids_hk_train']
             king_valid_indices = data_['king_ids_hk_valid']
-            # hj_word2id = data_['hj_word2id']
-            # kr_word2id = data_['kr_word2id']
+            hj_word2id = data_['hanja_word2id']
+            kr_word2id = data_['korean_word2id']
             src_vocab_num = len(hj_word2id.keys())
             trg_vocab_num = len(kr_word2id.keys())
 

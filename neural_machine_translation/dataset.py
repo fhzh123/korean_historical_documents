@@ -7,8 +7,7 @@ import torch
 from torch.utils.data.dataset import Dataset
 
 class CustomDataset(Dataset):
-    def __init__(self, src_list, trg_list, king_list, 
-                 pad_idx=0, min_len=4, max_len=300):
+    def __init__(self, src_list, trg_list, king_list, pad_idx=0, min_len=4, max_len=300):
         src_list, trg_list = zip(*[(h, k) for h, k in zip(src_list, trg_list)\
              if len(h) <= max_len and len(k) <= max_len])
         self.hanja_korean = [(h, k) for h, k in zip(src_list, trg_list) \
