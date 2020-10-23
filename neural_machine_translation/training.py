@@ -33,19 +33,34 @@ def training(args):
     #===================================#
 
     print('Data Load & Setting!')
-    with open(os.path.join(args.save_path, 'nmt_processed.pkl'), 'rb') as f:
-        data_ = pickle.load(f)
-        hj_train_indices = data_['hj_train_indices']
-        hj_valid_indices = data_['hj_valid_indices']
-        kr_train_indices = data_['kr_train_indices']
-        kr_valid_indices = data_['kr_valid_indices']
-        king_train_indices = data_['king_train_indices']
-        king_valid_indices = data_['king_valid_indices']
-        hj_word2id = data_['hj_word2id']
-        kr_word2id = data_['kr_word2id']
-        src_vocab_num = len(hj_word2id.keys())
-        trg_vocab_num = len(kr_word2id.keys())
-        del data_
+    if args.dataset == 'total_data':
+        with open(os.path.join(args.save_path, 'preprocessed_data.json'), 'r') as f:
+            data_ = json.load(f)
+            hj_train_indices = data_['train_hanja_indices']
+            hj_valid_indices = data_['valid_hanja_indices']
+            kr_train_indices = data_['train_korean_indices']
+            kr_valid_indices = data_['valid_korean_indices']
+            king_train_indices = data_['king_ids_hk_train']
+            king_valid_indices = data_['king_ids_hk_valid']
+            # hj_word2id = data_['hj_word2id']
+            # kr_word2id = data_['kr_word2id']
+            src_vocab_num = len(hj_word2id.keys())
+            trg_vocab_num = len(kr_word2id.keys())
+
+    elif args.dataset == 'normal_data':
+        with open(os.path.join(args.save_path, 'nmt_processed.pkl'), 'rb') as f:
+            data_ = pickle.load(f)
+            hj_train_indices = data_['hj_train_indices']
+            hj_valid_indices = data_['hj_valid_indices']
+            kr_train_indices = data_['kr_train_indices']
+            kr_valid_indices = data_['kr_valid_indices']
+            king_train_indices = data_['king_train_indices']
+            king_valid_indices = data_['king_valid_indices']
+            hj_word2id = data_['hj_word2id']
+            kr_word2id = data_['kr_word2id']
+            src_vocab_num = len(hj_word2id.keys())
+            trg_vocab_num = len(kr_word2id.keys())
+            del data_
 
     # with open(os.path.join(args.save_path_kr, 'kr_word2id.pkl'), 'rb') as f:
     #     kr_word2id = pickle.load(f)
