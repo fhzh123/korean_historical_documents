@@ -25,6 +25,7 @@ if __name__=='__main__':
     parser = argparse.ArgumentParser(description='NMT argparser')
     # Preprocessing setting
     parser.add_argument('--preprocessing', action='store_true')
+    parser.add_argument('--hj_vocab_size', default=32000, type=int, help='Hanja vocabulary size; Default is 32000')
     parser.add_argument('--kr_vocab_size', default=32000, type=int, help='Korean vocabulary size; Default is 32000')
     parser.add_argument('--save_path', default='./preprocessing', 
                         type=str)

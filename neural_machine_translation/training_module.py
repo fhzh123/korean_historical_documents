@@ -1,12 +1,13 @@
 import os
 import time
 import pandas as pd
+import sentencepiece as spm
 
 import torch
 
-from .utils import accuracy
+from .utils import accuracy, CustomError
 
-def train_model(args, model, dataloader_dict, optimizer, criterion, scheduler, device):
+def model_training(args, model, dataloader_dict, optimizer, criterion, scheduler, device):
 
     best_val_loss = None
     total_train_loss_list = list()
@@ -38,7 +39,6 @@ def train_model(args, model, dataloader_dict, optimizer, criterion, scheduler, d
                     # Target Masking
                     tgt_mask = model.generate_square_subsequent_mask(label_sequences.size(1))
                     tgt_mask = tgt_mask.to(device, non_blocking=True)
-                    trg_sequences_target = label_sequences[:, 1:]
                     # tgt_mask = tgt_mask.transpose(0, 1)
 
                 # Optimizer setting
@@ -47,9 +47,9 @@ def train_model(args, model, dataloader_dict, optimizer, criterion, scheduler, d
                 # Model / Calculate loss
                 with torch.set_grad_enabled(phase == 'train'):
                     if args.model_setting == 'transformer':
-                        predicted = model(input_sequences, trg_sequences_target[:, :-1], king_id, 
+                        predicted = model(input_sequences, label_sequences, king_id, 
                                           tgt_mask, non_pad)
-                        predicted = predicted.view(-1, predicted.size(-1))
+                        # predicted = predicted.view(-1, predicted.size(-1))
                         loss = criterion(predicted, trg_sequences_target)
                     if args.model_setting == 'rnn':
                         teacher_forcing_ratio_ = 0.5
@@ -108,3 +108,43 @@ def train_model(args, model, dataloader_dict, optimizer, criterion, scheduler, d
 
     pd.DataFrame(total_train_loss_list).to_csv(os.path.join(args.save_path, f'train_loss_{args.baseline}_{args.model_setting}_{args.resume}.csv'), index=False)
     pd.DataFrame(total_test_loss_list).to_csv(os.path.join(args.save_path, f'test_loss_{args.baseline}_{args.model_setting}_{args.resume}.csv'), index=False)
+
+def sentencepiece_training(lang, split_record, args):
+    # 0) Pre-setting
+    if lang == 'korean':
+        vocab_size = args.kr_vocab_size
+    elif lang == 'hanja':
+        vocab_size = args.hj_vocab_size
+    else:
+        raise CustomError('Sorry; Language not supported')
+
+    # 1) Make Korean text to train vocab
+    with open(f'{args.save_path}/{lang}.txt', 'w') as f:
+        for text in split_record['train']:
+            f.write(f'{text}\n')
+
+    # 2) SentencePiece model training
+    spm.SentencePieceProcessor()
+    spm.SentencePieceTrainer.Train(
+        f'--input={args.save_path}/{lang}.txt --model_prefix={args.save_path}/m_{lang} --model_type=bpe '
+        f'--vocab_size={vocab_size} --character_coverage=0.995 --split_by_whitespace=true '
+        f'--pad_id={args.pad_idx} --unk_id={args.unk_idx} --bos_id={args.bos_idx} --eos_id={args.eos_idx}')
+
+    # 3) Korean vocabulary setting
+    lang_vocab = list()
+    with open(f'{args.save_path}/m_{lang}.vocab') as f:
+        for line in f:
+            lang_vocab.append(line[:-1].split('\t')[0])
+    lang_word2id = {w: i for i, w in enumerate(lang_vocab)}
+
+    # 4) SentencePiece model load
+    spm_ = spm.SentencePieceProcessor()
+    spm_.Load(f"{args.save_path}/m_{lang}.model")
+
+    # 5) Korean parsing by SentencePiece model
+    train_lang_indices = [[args.bos_idx] + spm_.EncodeAsIds(korean) + [args.eos_idx] for korean in split_record['train']]
+    valid_lang_indices = [[args.bos_idx] + spm_.EncodeAsIds(korean) + [args.eos_idx] for korean in split_record['valid']]
+    test_lang_indices = [[args.bos_idx] + spm_.EncodeAsIds(korean) + [args.eos_idx] for korean in split_record['test']]
+
+    # 6) Return
+    return (train_lang_indices, valid_lang_indices, test_lang_indices), lang_word2id

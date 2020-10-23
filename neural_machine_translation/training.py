@@ -2,6 +2,7 @@
 import os
 import math
 import time
+import json
 import pickle
 import argparse
 import numpy as np
@@ -21,7 +22,7 @@ from .dataset import CustomDataset, PadCollate
 from .model.transformer import Transformer
 from .model.rnn import Encoder, Decoder, Seq2Seq
 from .optimizer import Ralamb, WarmupLinearSchedule
-from .training_module import train_model
+from .training_module import model_training
 from .utils import accuracy
 
 def training(args):
@@ -70,11 +71,13 @@ def training(args):
     #==========DWE Results Open==========#
     #====================================#
 
-    with open(os.path.join(args.save_path, 'hj_emb_mat.pkl'), 'rb') as f:
-        emb_mat_src = pickle.load(f)
+    if not args.src_baseline:
+        with open(os.path.join(args.save_path, 'hj_emb_mat.pkl'), 'rb') as f:
+            emb_mat_src = pickle.load(f)
 
-    # with open(os.path.join(args.save_path_kr, 'emb_mat.pkl'), 'rb') as f:
-    #     emb_mat_trg = pickle.load(f)
+    if not args.trg_baseline:
+        with open(os.path.join(args.save_path_kr, 'emb_mat.pkl'), 'rb') as f:
+            emb_mat_trg = pickle.load(f)
 
     #===================================#
     #===========Model Setting===========#
@@ -121,4 +124,4 @@ def training(args):
     #=========Model Train Start=========#
     #===================================#
 
-    train_model(args, model, dataloader_dict, optimizer, criterion, scheduler, device)
+    model_training(args, model, dataloader_dict, optimizer, criterion, scheduler, device)

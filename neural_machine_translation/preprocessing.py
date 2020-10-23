@@ -11,6 +11,7 @@ from tqdm import tqdm
 from collections import Counter
 
 # Import Custom Modules
+from .training_module import sentencepiece_training
 from .utils import terminal_size, train_test_split, hj_encode_to_ids
 
 def preprocessing(args):
@@ -57,49 +58,49 @@ def preprocessing(args):
     print(f"valid: {len(split_src_record['valid'])}")
     print(f"test: {len(split_src_record['test'])}")
 
-    #====================================#
-    #==========DWE Results Open==========#
-    #====================================#
-
-    with open(os.path.join(args.save_path, 'hj_word2id.pkl'), 'rb') as f:
-        hj_word2id = pickle.load(f)['hanja_word2id']
-
     #===================================#
     #=======Hanja Pre-processing========#
     #===================================#
 
-    # 1) Hanja sentence parsing setting
     print('Hanja sentence parsing...')
     start_time = time.time()
-    hj_parsed_indices_train = list()
-    hj_parsed_indices_valid = list()
-    hj_parsed_indices_test = list()
 
-    # 2) Parsing sentence
+    if args.src_baseline:
+        ind_set, hj_word2id = sentencepiece_training('hanja', split_src_record, args)
+        train_hanja_indices = ind_set[0]
+        valid_hanja_indices = ind_set[1]
+        test_hanja_indices = ind_set[2]
+    else:
+        with open(os.path.join(args.save_path, 'hj_word2id.pkl'), 'rb') as f:
+            hj_word2id = pickle.load(f)['hanja_word2id']
 
-    word_counter = Counter()
-    hanja_word2id = ['<pad>', '<s>', '</s>', '<unk>']
-    # Hanja Counter
-    for sentence in split_src_record['train']:
-        for word in sentence:
-            word_counter.update(word)
+        # 1) Hanja sentence parsing setting
+        train_hanja_indices = list()
+        valid_hanja_indices = list()
+        test_hanja_indices = list()
 
-    hanja_word2id.extend([w for w, freq in word_counter.items() if freq >= 10])
-    hj_word2id = {w: i for i, w in enumerate(hanja_word2id)}
+        # 2) Parsing sentence
 
-    # 2-1) Train data parsing
-    # 1) Train data parsing (From utils.py)
+        word_counter = Counter()
+        hanja_word2id = ['<pad>', '<s>', '</s>', '<unk>']
+        # Hanja Counter
+        for sentence in split_src_record['train']:
+            for word in sentence:
+                word_counter.update(word)
 
-    print('Train data start...')
-    hj_parsed_indices_train = hj_encode_to_ids(split_src_record['train'], hj_word2id, args)
+        hanja_word2id.extend([w for w, freq in word_counter.items() if w in hj_word2id.keys() and freq >= 10])
+        hj_word2id = {w: i for i, w in enumerate(hanja_word2id)}
 
-    # 2) Valid data parsing
-    print('Valid data start...')
-    hj_parsed_indices_valid = hj_encode_to_ids(split_src_record['valid'], hj_word2id, args)
+        # 3-1) Train & valid & test data parsing (From utils.py)
 
-    # 3) Test data parsing
-    print('Test data start...')
-    hj_parsed_indices_test = hj_encode_to_ids(split_src_record['test'], hj_word2id, args)
+        print('Train data start...')
+        train_hanja_indices = hj_encode_to_ids(split_src_record['train'], hj_word2id, args)
+
+        print('Valid data start...')
+        valid_hanja_indices = hj_encode_to_ids(split_src_record['valid'], hj_word2id, args)
+
+        print('Test data start...')
+        test_hanja_indices = hj_encode_to_ids(split_src_record['test'], hj_word2id, args)
 
     print(f'Done! ; {round((time.time()-start_time)/60, 3)}min spend')
 
@@ -107,33 +108,11 @@ def preprocessing(args):
     #=======Korean Pre-processing=======#
     #===================================#
 
-    # 1) Make Korean text to train vocab
-    with open(f'{args.save_path}/korean.txt', 'w') as f:
-        for korean in split_trg_record['train']:
-            f.write(f'{korean}\n')
-
-    # 2) SentencePiece model training
-    spm.SentencePieceProcessor()
-    spm.SentencePieceTrainer.Train(
-        f'--input={args.save_path}/korean.txt --model_prefix={args.save_path}/m_korean --model_type=bpe '
-        f'--vocab_size={args.kr_vocab_size} --character_coverage=0.995 --split_by_whitespace=true '
-        f'--pad_id={args.pad_idx} --unk_id={args.unk_idx} --bos_id={args.bos_idx} --eos_id={args.eos_idx}')
-
-    # 3) Korean vocabulary setting
-    korean_vocab = list()
-    with open(f'{args.save_path}/m_korean.vocab') as f:
-        for line in f:
-            korean_vocab.append(line[:-1].split('\t')[0])
-    korean_word2id = {w: i for i, w in enumerate(korean_vocab)}
-
-    # 4) SentencePiece model load
-    sp_kr = spm.SentencePieceProcessor()
-    sp_kr.Load(f"{args.save_path}/m_korean.model")
-
-    # 5) Korean parsing by SentencePiece model
-    train_korean_indices = [[args.bos_idx] + sp_kr.EncodeAsIds(korean) + [args.eos_idx] for korean in split_trg_record['train']]
-    valid_korean_indices = [[args.bos_idx] + sp_kr.EncodeAsIds(korean) + [args.eos_idx] for korean in split_trg_record['valid']]
-    test_korean_indices = [[args.bos_idx] + sp_kr.EncodeAsIds(korean) + [args.eos_idx] for korean in split_trg_record['test']]
+    ind_set, kr_word2id = sentencepiece_training('korean', split_trg_record, args)
+    
+    train_korean_indices = ind_set[0]
+    valid_korean_indices = ind_set[1]
+    test_korean_indices = ind_set[2]
 
     #===================================#
     #==============Saving===============#
@@ -144,9 +123,9 @@ def preprocessing(args):
 
     with open(os.path.join(args.save_path, 'nmt_processed.pkl'), 'wb') as f:
         pickle.dump({
-            'hj_train_indices': hj_parsed_indices_train,
-            'hj_valid_indices': hj_parsed_indices_valid,
-            'hj_test_indices': hj_parsed_indices_test,
+            'hj_train_indices': train_hanja_indices,
+            'hj_valid_indices': valid_hanja_indices,
+            'hj_test_indices': test_hanja_indices,
             'kr_train_indices': train_korean_indices,
             'kr_valid_indices': valid_korean_indices,
             'kr_test_indices': test_korean_indices,
@@ -154,9 +133,9 @@ def preprocessing(args):
             'king_valid_indices': split_king_record['valid'],
             'king_test_indices': split_king_record['test'],
             'hj_word2id': hj_word2id,
-            'kr_word2id': korean_word2id,
+            'kr_word2id': kr_word2id,
             'hj_id2word': {v: k for k, v in hj_word2id.items()},
-            'kr_id2word': {v: k for k, v in korean_word2id.items()}
+            'kr_id2word': {v: k for k, v in kr_word2id.items()}
         }, f)
 
     print(f'Done! ; {round((time.time()-start_time)/60, 3)}min spend')
