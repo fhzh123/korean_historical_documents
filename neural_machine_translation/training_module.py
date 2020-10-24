@@ -27,6 +27,10 @@ def model_training(args, model, dataloader_dict, optimizer, criterion, scheduler
                 val_top5_acc = 0
                 val_top10_acc = 0
             for i, (src, trg, king_id) in enumerate(dataloader_dict[phase]):
+
+                # Optimizer setting
+                optimizer.zero_grad()
+
                 # Sourcen, Target sentence setting
                 input_sequences = src.to(device, non_blocking=True)
                 label_sequences = trg.to(device, non_blocking=True)
@@ -39,10 +43,6 @@ def model_training(args, model, dataloader_dict, optimizer, criterion, scheduler
                     # Target Masking
                     tgt_mask = model.generate_square_subsequent_mask(label_sequences.size(1))
                     tgt_mask = tgt_mask.to(device, non_blocking=True)
-                    # tgt_mask = tgt_mask.transpose(0, 1)
-
-                # Optimizer setting
-                optimizer.zero_grad()
 
                 # Model / Calculate loss
                 with torch.set_grad_enabled(phase == 'train'):
@@ -76,7 +76,7 @@ def model_training(args, model, dataloader_dict, optimizer, criterion, scheduler
                     total_train_loss_list.append(loss.item())
 
                     # Print loss value only training
-                    if freq == args.print_freq:
+                    if freq == args.print_freq or i == 0 or i == len(dataloader_dict['train']):
                         total_loss = loss.item()
                         top1_acc, top5_acc, top10_acc = accuracy(predicted, 
                                                                  trg_sequences_target, 
@@ -95,7 +95,7 @@ def model_training(args, model, dataloader_dict, optimizer, criterion, scheduler
                 total_test_loss_list.append(val_loss)
                 print("[Epoch:%d] val_loss:%5.3f | top1_acc:%5.2f | top5_acc:%5.2f | top10_acc:%5.2f | spend_time:%5.2fmin"
                         % (e+1, val_loss, val_top1_acc, val_top5_acc, val_top10_acc, (time.time() - start_time_e) / 60))
-                if not best_val_loss or val_loss > best_val_loss:
+                if not best_val_loss or val_loss < best_val_loss:
                     print("[!] saving model...")
                     if not os.path.exists(args.save_path):
                         os.mkdir(args.save_path)

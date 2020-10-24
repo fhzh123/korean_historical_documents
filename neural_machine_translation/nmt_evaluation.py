@@ -139,7 +139,6 @@ def main(args):
             # Target Masking
             tgt_mask = model.generate_square_subsequent_mask(label_sequences.size(1))
             tgt_mask = tgt_mask.to(device, non_blocking=True)
-            tgt_mask = tgt_mask.transpose(0, 1)
 
         # Model / Calculate loss
         with torch.no_grad():
