@@ -71,15 +71,19 @@ def training(args):
 
     dataset_dict = {
         'train': CustomDataset(hj_train_indices, kr_train_indices, king_train_indices,
-                            min_len=args.min_len, src_max_len=args.src_max_len, trg_max_len=args.trg_max_len),
+                            min_len=args.min_len, src_max_len=args.src_max_len, 
+                            trg_max_len=args.trg_max_len),
         'valid': CustomDataset(hj_valid_indices, kr_valid_indices, king_valid_indices,
-                            min_len=args.min_len, src_max_len=args.src_max_len, trg_max_len=args.trg_max_len)
+                            min_len=args.min_len, src_max_len=args.src_max_len, 
+                            trg_max_len=args.trg_max_len)
     }
     dataloader_dict = {
         'train': DataLoader(dataset_dict['train'], collate_fn=PadCollate(), drop_last=True,
-                            batch_size=args.batch_size, shuffle=True, pin_memory=True),
+                            batch_size=args.batch_size, shuffle=True, 
+                            num_workers=4, pin_memory=True),
         'valid': DataLoader(dataset_dict['valid'], collate_fn=PadCollate(), drop_last=True,
-                            batch_size=args.batch_size, shuffle=True, pin_memory=True)
+                            batch_size=args.batch_size, shuffle=True, 
+                            num_workers=4, pin_memory=True)
     }
 
     #====================================#
@@ -134,11 +138,11 @@ def training(args):
     # scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.lr_decay_step, gamma=args.lr_decay)
     scheduler = WarmupLinearSchedule(optimizer, warmup_steps=len(dataloader_dict['train'])*3, 
                                      t_total=len(dataloader_dict['train'])*args.num_epoch)
-    criterion = nn.CrossEntropyLoss(ignore_index=args.pad_idx)
+    # criterion = nn.CrossEntropyLoss(ignore_index=args.pad_idx)
     model.to(device)
 
     #===================================#
     #=========Model Train Start=========#
     #===================================#
 
-    model_training(args, model, dataloader_dict, optimizer, criterion, scheduler, device)
+    model_training(args, model, dataloader_dict, optimizer, scheduler, device)

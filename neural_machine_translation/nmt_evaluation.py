@@ -18,12 +18,10 @@ from torch import optim
 from torch.utils.data import DataLoader
 
 # Import Custom Module
-from translation.dataset import CustomDataset, PadCollate
-from translation.model import Transformer
-from translation.optimizer import Ralamb, WarmupLinearSchedule
-from translation.rnn_model import Encoder, Decoder, Seq2Seq
-from named_entity_recognition.model import NER_model
-from utils import accuracy
+from .dataset import CustomDataset, PadCollate
+from .model.transformer import Transformer
+from .model.rnn import Encoder, Decoder, Seq2Seq
+from .utils import accuracy
 
 def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -63,23 +61,24 @@ def main(args):
     #========DataLoader Setting=========#
     #===================================#
 
-    dataset_dict = {
-        'test': CustomDataset(hj_test_indices, kr_test_indices, king_test_indices,
-                            min_len=args.min_len, max_len=args.max_len)
-    }
-    dataloader_dict = {
-        'test': DataLoader(dataset_dict['test'], collate_fn=PadCollate(), drop_last=True,
-                            batch_size=args.batch_size, shuffle=True, pin_memory=True)
-    }
+    testDataset = CustomDataset(hj_test_indices, kr_test_indices, king_test_indices,
+                                min_len=args.min_len, src_max_len=args.src_max_len, 
+                                trg_max_len=args.trg_max_len)
+    testDataloader = DataLoader(testDataset, collate_fn=PadCollate(), drop_last=True,
+                                batch_size=args.batch_size, shuffle=True, 
+                                num_workers=4, pin_memory=True)
 
     #====================================#
     #==========DWE Results Open==========#
     #====================================#
 
-    with open(os.path.join(args.save_path, 'emb_mat.pkl'), 'rb') as f:
-        emb_mat_src = pickle.load(f)
-    with open(os.path.join(args.save_path_kr, 'emb_mat.pkl'), 'rb') as f:
-        emb_mat_trg = pickle.load(f)
+    if not args.src_baseline:
+        with open(os.path.join(args.save_path, 'hj_emb_mat.pkl'), 'rb') as f:
+            emb_mat_src = pickle.load(f)
+
+    if not args.trg_baseline:
+        with open(os.path.join(args.save_path_kr, 'emb_mat.pkl'), 'rb') as f:
+            emb_mat_trg = pickle.load(f)
 
     #===================================#
     #===========Model Setting===========#
@@ -87,16 +86,16 @@ def main(args):
 
     print("Build model")
     if args.model_setting == 'transformer':
-        model = Transformer(emb_mat_src, emb_mat_trg, hj_word2id, kr_word2id, 
-                    src_vocab_num, trg_vocab_num, pad_idx=args.pad_idx, bos_idx=args.bos_idx, 
-                    eos_idx=args.eos_idx, max_len=args.max_len,
-                    d_model=args.d_model, d_embedding=args.d_embedding, n_head=args.n_head, 
-                    dim_feedforward=args.dim_feedforward, dropout=args.dropout,
+        model = Transformer(src_vocab_num, trg_vocab_num, 
+                    pad_idx=args.pad_idx, bos_idx=args.bos_idx, eos_idx=args.eos_idx, 
+                    src_max_len=args.src_max_len, trg_max_len=args.trg_max_len,
+                    d_model=args.d_model, d_embedding=args.d_embedding, 
+                    n_head=args.n_head, dim_feedforward=args.dim_feedforward, dropout=args.dropout,
                     num_encoder_layer=args.num_encoder_layer, num_decoder_layer=args.num_decoder_layer,
-                    baseline=args.baseline, device=device)
+                    src_baseline=args.src_baseline, trg_baseline=args.trg_baseline, device=device)
     elif args.model_setting == 'rnn':
         encoder = Encoder(src_vocab_num, args.d_embedding, args.d_model, 
-                        emb_mat, hj_word2id, n_layers=args.num_encoder_layer, 
+                        emb_mat_src, hj_word2id, n_layers=args.num_encoder_layer, 
                         pad_idx=args.pad_idx, dropout=args.dropout)
         decoder = Decoder(args.d_embedding, args.d_model, trg_vocab_num, n_layers=args.num_decoder_layer, 
                         pad_idx=args.pad_idx, dropout=args.dropout)
@@ -104,18 +103,7 @@ def main(args):
     else:
         raise Exception('Model error')
 
-    if args.resume:
-        model_ner = NER_model(emb_mat=emb_mat, word2id=hj_word2id, pad_idx=args.pad_idx, bos_idx=args.bos_idx, eos_idx=args.eos_idx, max_len=args.max_len,
-                        d_model=args.d_model, d_embedding=args.d_embedding, n_head=args.n_head,
-                        dim_feedforward=args.dim_feedforward, n_layers=args.num_encoder_layer, dropout=args.dropout,
-                        crf_loss=args.crf_loss, device=device)
-        model_ner.load_state_dict(torch.load(os.path.join(args.save_path, 'ner_model_False.pt')))
-        model.transformer_encoder.load_state_dict(model_ner.transformer_encoder.state_dict())
-        for param in model.transformer_encoder.parameters():
-            param.requires_grad = False
-    print("Total Parameters:", sum([p.nelement() for p in model.parameters()]))
-
-    model.load_state_dict(torch.load('./save3/nmt_model_transformer_False_True_testing.pt'))
+    model.load_state_dict(torch.load('./preprocessing/nmt_model_transformer_testing.pt'))
     model.to(device)
     model.eval()
 

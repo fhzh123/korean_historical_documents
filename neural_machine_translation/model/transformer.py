@@ -53,10 +53,18 @@ class Transformer(nn.Module):
         #                                             dropout=dropout, activation='gelu')
         # self.transformer_encoder = nn.TransformerEncoder(encoder_layers, num_encoder_layer)
 
-        self_attn = MultiheadAttention(d_model, n_head, dropout=dropout)
+        # Testing
+        self.transformer_model = nn.Transformer(d_model=d_model, nhead=n_head, 
+                                                num_encoder_layers=num_encoder_layer,
+                                                num_decoder_layers=num_decoder_layer,
+                                                dim_feedforward=dim_feedforward,
+                                                dropout=dropout,
+                                                activation='gelu')
+
+        self_attn2 = MultiheadAttention(d_model, n_head, dropout=dropout)
         decoder_mask_attn = MultiheadAttention(d_model, n_head, dropout=dropout)
         self.decoders = nn.ModuleList([
-            TransformerDecoderLayer(d_model, self_attn, decoder_mask_attn,
+            TransformerDecoderLayer(d_model, self_attn2, decoder_mask_attn,
                 dim_feedforward, activation='gelu', dropout=dropout) \
                     for i in range(num_decoder_layer)])
 
@@ -88,14 +96,22 @@ class Transformer(nn.Module):
         #                         tgt_key_padding_mask=tgt_key_padding_mask)
 
     #===================================#
+    #=========Old Transformer===========#
+    #===================================#
+
+        decoder_out = self.transformer_model(encoder_out, decoder_out, tgt_mask=tgt_mask,
+                                             memory_key_padding_mask=src_key_padding_mask,
+                                             tgt_key_padding_mask=tgt_key_padding_mask)
+
+    #===================================#
     #==========P-Transformer============#
     #===================================#
 
-        for i in range(len(self.encoders)):
-            encoder_out = self.encoders[i](encoder_out, src_key_padding_mask=src_key_padding_mask)
-            decoder_out = self.decoders[i](decoder_out, encoder_out, tgt_mask=tgt_mask,
-                                memory_key_padding_mask=src_key_padding_mask,
-                                tgt_key_padding_mask=tgt_key_padding_mask)
+        # for i in range(len(self.encoders)):
+        #     encoder_out = self.encoders[i](encoder_out, src_key_padding_mask=src_key_padding_mask)
+        #     decoder_out = self.decoders[i](decoder_out, encoder_out, tgt_mask=tgt_mask,
+        #                         memory_key_padding_mask=src_key_padding_mask,
+        #                         tgt_key_padding_mask=tgt_key_padding_mask)
 
         decoder_out = decoder_out.transpose(0, 1).contiguous()
         if non_pad_position is not None:

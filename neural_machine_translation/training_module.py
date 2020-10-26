@@ -4,10 +4,12 @@ import pandas as pd
 import sentencepiece as spm
 
 import torch
+import torch.nn.functional as F
+from torch.nn.utils import clip_grad_norm_
 
 from .utils import accuracy, CustomError
 
-def model_training(args, model, dataloader_dict, optimizer, criterion, scheduler, device):
+def model_training(args, model, dataloader_dict, optimizer, scheduler, device):
 
     best_val_loss = None
     total_train_loss_list = list()
@@ -32,9 +34,9 @@ def model_training(args, model, dataloader_dict, optimizer, criterion, scheduler
                 optimizer.zero_grad()
 
                 # Sourcen, Target sentence setting
-                input_sequences = src.to(device, non_blocking=True)
-                label_sequences = trg.to(device, non_blocking=True)
-                king_id = king_id.to(device, non_blocking=True)
+                input_sequences = src.to(device)
+                label_sequences = trg.to(device)
+                king_id = king_id.to(device)
 
                 non_pad = label_sequences != args.pad_idx
                 trg_sequences_target = label_sequences[non_pad].contiguous().view(-1)
@@ -42,15 +44,17 @@ def model_training(args, model, dataloader_dict, optimizer, criterion, scheduler
                 if args.model_setting == 'transformer':
                     # Target Masking
                     tgt_mask = model.generate_square_subsequent_mask(label_sequences.size(1))
-                    tgt_mask = tgt_mask.to(device, non_blocking=True)
+                    tgt_mask = tgt_mask.to(device)
 
                 # Model / Calculate loss
                 with torch.set_grad_enabled(phase == 'train'):
                     if args.model_setting == 'transformer':
                         predicted = model(input_sequences, label_sequences, king_id, 
-                                          tgt_mask, non_pad)
+                                          tgt_mask=tgt_mask, non_pad_position=non_pad)
                         # predicted = predicted.view(-1, predicted.size(-1))
-                        loss = criterion(predicted, trg_sequences_target)
+                        loss = F.cross_entropy(predicted, trg_sequences_target, 
+                                               ignore_index=model.pad_idx, reduction='mean')
+                        # loss = criterion(predicted, trg_sequences_target)
                     if args.model_setting == 'rnn':
                         teacher_forcing_ratio_ = 0.5
                         input_sequences = input_sequences.transpose(0, 1)
@@ -60,6 +64,24 @@ def model_training(args, model, dataloader_dict, optimizer, criterion, scheduler
                         predicted = predicted.view(-1, trg_vocab_num)
                         trg_sequences_target = label_sequences.contiguous().view(-1)
                         loss = criterion(predicted, trg_sequences_target)
+
+                    # If phase train, then backward loss and step optimizer and scheduler
+                    if phase == 'train':
+                        loss.backward()
+                        optimizer.step()
+                        scheduler.step()
+                        clip_grad_norm_(model.parameters(), args.grad_clip)
+                        total_train_loss_list.append(loss.item())
+                        # Print loss value only training
+                        if freq == args.print_freq or i == 0 or i == len(dataloader_dict['train']):
+                            total_loss = loss.item()
+                            top1_acc, top5_acc, top10_acc = accuracy(predicted, 
+                                                                    trg_sequences_target, 
+                                                                    topk=(1,5,10))
+                            print("[Epoch:%d][%d/%d] train_loss:%5.3f | top1_acc:%5.2f | top5_acc:%5.2f | spend_time:%5.2fmin"
+                                    % (e+1, i, len(dataloader_dict['train']), total_loss, top1_acc, top5_acc, (time.time() - start_time_e) / 60))
+                            freq = 0
+                        freq += 1
                     if phase == 'valid':
                         val_loss += loss.item()
                         top1_acc, top5_acc, top10_acc = accuracy(predicted, 
@@ -68,23 +90,6 @@ def model_training(args, model, dataloader_dict, optimizer, criterion, scheduler
                         val_top1_acc += top1_acc.item()
                         val_top5_acc += top5_acc.item()
                         val_top10_acc += top10_acc.item()
-                # If phase train, then backward loss and step optimizer and scheduler
-                if phase == 'train':
-                    loss.backward()
-                    optimizer.step()
-                    scheduler.step()
-                    total_train_loss_list.append(loss.item())
-
-                    # Print loss value only training
-                    if freq == args.print_freq or i == 0 or i == len(dataloader_dict['train']):
-                        total_loss = loss.item()
-                        top1_acc, top5_acc, top10_acc = accuracy(predicted, 
-                                                                 trg_sequences_target, 
-                                                                 topk=(1,5,10))
-                        print("[Epoch:%d][%d/%d] train_loss:%5.3f | top1_acc:%5.2f | top5_acc:%5.2f | spend_time:%5.2fmin"
-                                % (e+1, i, len(dataloader_dict['train']), total_loss, top1_acc, top5_acc, (time.time() - start_time_e) / 60))
-                        freq = 0
-                    freq += 1
 
             # Finishing iteration
             if phase == 'valid':
