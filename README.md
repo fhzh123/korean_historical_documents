@@ -28,3 +28,7 @@ Korean historical documents analysis (Dynamic word embedding &amp; Named entity 
 ## 10/20
 
 * NER 수정 및 NMT 베이스라인 코드 작성 완료 (bilinear 코드 수정 필요)
+
+## 10/26
+
+* NMT Test중
