@@ -111,8 +111,8 @@ def model_training(args, model, dataloader_dict, optimizer, scheduler, device):
         # Learning rate scheduler setting
         # scheduler.step()
 
-    pd.DataFrame(total_train_loss_list).to_csv(os.path.join(args.save_path, f'train_loss_{args.baseline}_{args.model_setting}_{args.resume}.csv'), index=False)
-    pd.DataFrame(total_test_loss_list).to_csv(os.path.join(args.save_path, f'test_loss_{args.baseline}_{args.model_setting}_{args.resume}.csv'), index=False)
+    pd.DataFrame(total_train_loss_list).to_csv(os.path.join(args.save_path, f'train_loss_{args.src_baseline}_{args.trg_baseline}_{args.model_setting}.csv'), index=False)
+    pd.DataFrame(total_test_loss_list).to_csv(os.path.join(args.save_path, f'test_loss_{args.src_baseline}_{args.trg_baseline}_{args.model_setting}.csv'), index=False)
 
 def sentencepiece_training(lang, split_record, args):
     # 0) Pre-setting
