@@ -105,14 +105,14 @@ def model_training(args, model, dataloader_dict, optimizer, scheduler, device):
                     if not os.path.exists(args.save_path):
                         os.mkdir(args.save_path)
                     torch.save(model.state_dict(), 
-                               os.path.join(args.save_path, f'nmt_model_{args.model_setting}_testing.pt'))
+                               os.path.join(args.save_path, f'nmt_model_{args.model_setting}_testing2.pt'))
                     best_val_loss = val_loss
 
         # Learning rate scheduler setting
         # scheduler.step()
 
-    pd.DataFrame(total_train_loss_list).to_csv(os.path.join(args.save_path, f'train_loss_{args.src_baseline}_{args.trg_baseline}_{args.model_setting}.csv'), index=False)
-    pd.DataFrame(total_test_loss_list).to_csv(os.path.join(args.save_path, f'test_loss_{args.src_baseline}_{args.trg_baseline}_{args.model_setting}.csv'), index=False)
+    pd.DataFrame(total_train_loss_list).to_csv(os.path.join(args.save_path, f'train_loss_{args.src_baseline}_{args.trg_baseline}_{args.model_setting}2.csv'), index=False)
+    pd.DataFrame(total_test_loss_list).to_csv(os.path.join(args.save_path, f'test_loss_{args.src_baseline}_{args.trg_baseline}_{args.model_setting}2.csv'), index=False)
 
 def sentencepiece_training(lang, split_record, args):
     # 0) Pre-setting

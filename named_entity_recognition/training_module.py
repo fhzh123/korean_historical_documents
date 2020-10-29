@@ -3,7 +3,7 @@ import os
 import time
 import math
 import pandas as pd
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, recall_score, precision_score
 
 # Import PyTorch
 import torch
@@ -23,6 +23,8 @@ def train_model(args, model, dataloader_dict, optimizer, criterion, scheduler):
                 model.train()
             if phase == 'valid':
                 model.eval()
+                val_precision = 0
+                val_recall = 0
                 val_f1 = 0
                 val_loss = 0
             for i, (src, trg, king_id) in enumerate(dataloader_dict[phase]):
@@ -44,8 +46,9 @@ def train_model(args, model, dataloader_dict, optimizer, criterion, scheduler):
                         val_loss += loss.item()
                         output_list = output_flat.max(dim=1)[1].tolist()
                         real_list = trg_flat.tolist()
-                        f1_val = f1_score(real_list, output_list, average='macro')
-                        val_f1 += f1_val
+                        val_precision += precision_score(real_list, output_list)
+                        val_recall += recall_score(real_list, output_list)
+                        val_f1 += f1_score(real_list, output_list, average='macro')
                 # If phase train, then backward loss and step optimizer and scheduler
                 if phase == 'train':
                     loss.backward()
@@ -58,10 +61,13 @@ def train_model(args, model, dataloader_dict, optimizer, criterion, scheduler):
                         total_loss = loss.item()
                         output_list = output_flat.max(dim=1)[1].tolist()
                         real_list = trg_flat.tolist()
+                        precision_ = precision_score(real_list, output_list)
+                        recall_ = recall_score(real_list, output_list)
                         f1_ = f1_score(real_list, output_list, average='macro')
-                        print("[Epoch:%d][%d/%d] train_loss:%5.3f | train_pp:%5.3fS | train_f1:%5.2f | learning_rate:%3.8f | spend_time:%5.2fmin"
+                        print("[Epoch:%d][%d/%d] train_loss:%5.3f | train_pp:%5.3fS | train_precision:%5.3f | train_recall:%5.3f | train_f1:%5.3f | learning_rate:%3.8f | spend_time:%5.2fmin"
                                 % (e+1, i, len(dataloader_dict['train']), 
-                                total_loss, math.exp(total_loss), f1_, 
+                                total_loss, math.exp(total_loss), 
+                                precision_, recall_, f1_, 
                                 optimizer.param_groups[0]['lr'], 
                                 (time.time() - start_time_e) / 60))
                         freq = 0
@@ -70,11 +76,14 @@ def train_model(args, model, dataloader_dict, optimizer, criterion, scheduler):
             # Finishing iteration
             if phase == 'valid':
                 val_loss /= len(dataloader_dict['valid'])
+                val_precision /= len(dataloader_dict['valid'])
+                val_recall /= len(dataloader_dict['valid'])
                 val_f1 /= len(dataloader_dict['valid'])
                 total_test_loss_list.append(val_loss)
-                print("[Epoch:%d]val_loss:%5.3f | val_pp:%5.2f | val_f1:%5.2f | learning_rate:%3.8f | spend_time:%5.2fmin"
+                print("[Epoch:%d]val_loss:%5.3f | val_pp:%5.2f | val_precision:%5.3f | val_recall:%5.3f | val_f1:%5.3f | learning_rate:%3.8f | spend_time:%5.2fmin"
                         % (e+1, val_loss, 
-                        math.exp(val_loss), val_f1, optimizer.param_groups[0]['lr'], 
+                        math.exp(val_loss), val_precision, val_recall,
+                        val_f1, optimizer.param_groups[0]['lr'], 
                         (time.time() - start_time_e) / 60))
                 if not best_val_f1 or val_f1 > best_val_f1:
                     print("[!] saving model...")
