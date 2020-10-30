@@ -46,8 +46,8 @@ def train_model(args, model, dataloader_dict, optimizer, criterion, scheduler):
                         val_loss += loss.item()
                         output_list = output_flat.max(dim=1)[1].tolist()
                         real_list = trg_flat.tolist()
-                        val_precision += precision_score(real_list, output_list)
-                        val_recall += recall_score(real_list, output_list)
+                        val_precision += precision_score(real_list, output_list, average='macro')
+                        val_recall += recall_score(real_list, output_list, average='macro')
                         val_f1 += f1_score(real_list, output_list, average='macro')
                 # If phase train, then backward loss and step optimizer and scheduler
                 if phase == 'train':
@@ -61,8 +61,8 @@ def train_model(args, model, dataloader_dict, optimizer, criterion, scheduler):
                         total_loss = loss.item()
                         output_list = output_flat.max(dim=1)[1].tolist()
                         real_list = trg_flat.tolist()
-                        precision_ = precision_score(real_list, output_list)
-                        recall_ = recall_score(real_list, output_list)
+                        precision_ = precision_score(real_list, output_list, average='macro')
+                        recall_ = recall_score(real_list, output_list, average='macro')
                         f1_ = f1_score(real_list, output_list, average='macro')
                         print("[Epoch:%d][%d/%d] train_loss:%5.3f | train_pp:%5.3fS | train_precision:%5.3f | train_recall:%5.3f | train_f1:%5.3f | learning_rate:%3.8f | spend_time:%5.2fmin"
                                 % (e+1, i, len(dataloader_dict['train']), 

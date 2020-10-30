@@ -9,7 +9,7 @@ from glob import glob
 from tqdm import tqdm
 
 # Import Custom Modules
-from .utils import terminal_size, train_test_split, encode_to_ids, ner_encode
+from .utils import terminal_size, train_test_split, hj_encode_to_ids, ner_encode
 
 def preprocessing(args):
     #===================================#
