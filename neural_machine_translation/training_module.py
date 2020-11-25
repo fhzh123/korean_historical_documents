@@ -7,7 +7,7 @@ import torch
 import torch.nn.functional as F
 from torch.nn.utils import clip_grad_norm_
 
-from .utils import accuracy, CustomError
+from .utils import accuracy, CustomError, cal_loss
 
 def model_training(args, model, dataloader_dict, optimizer, scheduler, device):
 
@@ -38,22 +38,29 @@ def model_training(args, model, dataloader_dict, optimizer, scheduler, device):
                 label_sequences = trg.to(device)
                 king_id = king_id.to(device)
 
-                non_pad = label_sequences != args.pad_idx
-                trg_sequences_target = label_sequences[non_pad].contiguous().view(-1)
+                # Fod old version
+                # non_pad = label_sequences != args.pad_idx
+                # trg_sequences_target = label_sequences[non_pad].contiguous().view(-1)
+                trg_sequences_target = label_sequences.contiguous().view(-1)
 
-                if args.model_setting == 'transformer':
-                    # Target Masking
-                    tgt_mask = model.generate_square_subsequent_mask(label_sequences.size(1))
-                    tgt_mask = tgt_mask.to(device)
+                # if args.model_setting == 'transformer':
+                #     # Target Masking
+                #     tgt_mask = model.generate_square_subsequent_mask(label_sequences.size(1))
+                #     tgt_mask = tgt_mask.to(device)
 
                 # Model / Calculate loss
                 with torch.set_grad_enabled(phase == 'train'):
-                    if args.model_setting == 'transformer':
-                        predicted = model(input_sequences, label_sequences, king_id, 
-                                          tgt_mask=tgt_mask, non_pad_position=non_pad)
+                    if 'transformer' in args.model_setting.lower():
+                        # For old version
+                        # predicted = model(input_sequences, label_sequences, king_id, 
+                        #                   tgt_mask=tgt_mask, non_pad_position=non_pad)
+                        predicted = model(input_sequences, label_sequences)
+                        loss = cal_loss(predicted, trg_sequences_target,
+                                        trg_pad_idx=args.pad_idx,
+                                        smoothing=args.smoothing_loss)
                         # predicted = predicted.view(-1, predicted.size(-1))
-                        loss = F.cross_entropy(predicted, trg_sequences_target, 
-                                               ignore_index=model.pad_idx, reduction='mean')
+                        # loss = F.cross_entropy(predicted, trg_sequences_target, 
+                        #                        ignore_index=model.pad_idx, reduction='mean')
                         # loss = criterion(predicted, trg_sequences_target)
                     if args.model_setting == 'rnn':
                         teacher_forcing_ratio_ = 0.5

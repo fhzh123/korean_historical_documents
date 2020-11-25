@@ -19,7 +19,8 @@ from torch.utils.data import DataLoader
 
 # Import Custom Module
 from .dataset import CustomDataset, PadCollate
-from .model.transformer import Transformer
+# from .model.transformer import PTransformer, Transformer
+from .model.transformer.Models import PTransformer, Transformer
 from .model.rnn import Encoder, Decoder, Seq2Seq
 from .optimizer import Ralamb, WarmupLinearSchedule
 from .training_module import model_training
@@ -103,14 +104,24 @@ def training(args):
     #===================================#
 
     print("Build model")
-    if args.model_setting == 'transformer':
-        model = Transformer(src_vocab_num, trg_vocab_num, 
+    if 'transformer' in args.model_setting.lower():
+        if args.model_setting == 'PTransformer':
+            transformer_model_setting = PTransformer
+        else:
+            transformer_model_setting = Transformer
+        model = transformer_model_setting(src_vocab_num, trg_vocab_num, 
                     pad_idx=args.pad_idx, bos_idx=args.bos_idx, eos_idx=args.eos_idx, 
                     src_max_len=args.src_max_len, trg_max_len=args.trg_max_len,
                     d_model=args.d_model, d_embedding=args.d_embedding, 
-                    n_head=args.n_head, dim_feedforward=args.dim_feedforward, dropout=args.dropout,
+                    n_head=args.n_head, d_k=args.d_k, d_v=args.d_v,
+                    dim_feedforward=args.dim_feedforward, dropout=args.dropout,
                     num_encoder_layer=args.num_encoder_layer, num_decoder_layer=args.num_decoder_layer,
-                    src_baseline=args.src_baseline, trg_baseline=args.trg_baseline, device=device)
+                    num_common_layer=args.num_common_layer,
+                    src_baseline=args.src_baseline, trg_baseline=args.trg_baseline, 
+                    share_qk=args.share_qk, swish_activation=args.swish_activation,
+                    trg_emb_prj_weight_sharing=args.trg_emb_prj_weight_sharing,
+                    emb_src_trg_weight_sharing=args.emb_src_trg_weight_sharing,
+                    device=device)
     elif args.model_setting == 'rnn':
         encoder = Encoder(src_vocab_num, args.d_embedding, args.d_model, 
                         emb_mat_src, hj_word2id, n_layers=args.num_encoder_layer, 

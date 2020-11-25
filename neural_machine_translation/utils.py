@@ -5,6 +5,8 @@ import termios
 import numpy as np
 from tqdm import tqdm
 
+import torch.nn.functional as F
+
 class CustomError(Exception):
     def __init__(self, msg):
         super().__init__(msg)
@@ -85,3 +87,18 @@ def accuracy(output, target, topk=(1,)):
         correct_k = correct[:k].view(-1).float().sum(0)
         res.append(correct_k.mul_(100.0 / batch_size))
     return res
+
+def cal_loss(pred, gold, trg_pad_idx, smoothing=False, eps=0.1):
+    ''' Calculate cross entropy loss, apply label smoothing if needed. '''
+    if smoothing:
+        n_class = pred.size(1)
+
+        one_hot = torch.zeros_like(pred).scatter(1, gold.view(-1, 1), 1)
+        one_hot = one_hot * (1 - eps) + (1 - one_hot) * eps / (n_class - 1)
+        log_prb = F.log_softmax(pred, dim=1)
+
+        non_pad_mask = gold.ne(trg_pad_idx)
+        loss = -(one_hot * log_prb).sum(dim=1)
+        return loss.masked_select(non_pad_mask).mean()
+    else:
+        return F.cross_entropy(pred, gold, ignore_index=trg_pad_idx, reduction='mean')
