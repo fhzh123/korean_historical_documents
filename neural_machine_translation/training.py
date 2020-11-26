@@ -19,10 +19,9 @@ from torch.utils.data import DataLoader
 
 # Import Custom Module
 from .dataset import CustomDataset, PadCollate
-# from .model.transformer import PTransformer, Transformer
 from .model.transformer.Models import PTransformer, Transformer
-from .model.rnn import Encoder, Decoder, Seq2Seq
-from .optimizer import Ralamb, WarmupLinearSchedule
+# from .model.rnn import Encoder, Decoder, Seq2Seq
+from .model.transformer.Optim import Ralamb, WarmupLinearSchedule
 from .training_module import model_training
 from .utils import accuracy
 
@@ -144,12 +143,14 @@ def training(args):
     # print("Total Parameters:", sum([p.nelement() for p in model.parameters()]))
     print(f"Total number of trainingsets  iterations - {len(dataset_dict['train'])}, {len(dataloader_dict['train'])}")
 
-    optimizer = Ralamb(params=filter(lambda p: p.requires_grad, model.parameters()),
+    # optimizer = Ralamb(params=filter(lambda p: p.requires_grad, model.parameters()),
+    #                    lr=args.lr, weight_decay=args.w_decay)
+    # scheduler = WarmupLinearSchedule(optimizer, warmup_steps=len(dataloader_dict['train'])*5, 
+    #                                  t_total=len(dataloader_dict['train'])*args.num_epoch)
+    optimizer = Ralamb(params=filter(lambda p: p.requires_grad, model.parameters()), 
                        lr=args.lr, weight_decay=args.w_decay)
-    # scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.lr_decay_step, gamma=args.lr_decay)
-    scheduler = WarmupLinearSchedule(optimizer, warmup_steps=len(dataloader_dict['train'])*3, 
+    scheduler = WarmupLinearSchedule(optimizer, warmup_steps=args.n_warmup_epochs*len(dataloader_dict['train']), 
                                      t_total=len(dataloader_dict['train'])*args.num_epoch)
-    # criterion = nn.CrossEntropyLoss(ignore_index=args.pad_idx)
     model.to(device)
 
     #===================================#

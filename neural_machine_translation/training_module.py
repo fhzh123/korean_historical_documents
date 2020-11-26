@@ -85,8 +85,9 @@ def model_training(args, model, dataloader_dict, optimizer, scheduler, device):
                             top1_acc, top5_acc, top10_acc = accuracy(predicted, 
                                                                     trg_sequences_target, 
                                                                     topk=(1,5,10))
-                            print("[Epoch:%d][%d/%d] train_loss:%5.3f | top1_acc:%5.2f | top5_acc:%5.2f | spend_time:%5.2fmin"
-                                    % (e+1, i, len(dataloader_dict['train']), total_loss, top1_acc, top5_acc, (time.time() - start_time_e) / 60))
+                            print("[Epoch:%d][%d/%d] train_loss:%5.3f | top1_acc:%5.2f | top5_acc:%5.2f | lr:%1.6f | spend_time:%5.2fmin"
+                                    % (e+1, i, len(dataloader_dict['train']), total_loss, top1_acc, top5_acc, 
+                                    optimizer.param_groups[0]['lr'], (time.time() - start_time_e) / 60))
                             freq = 0
                         freq += 1
                     if phase == 'valid':
@@ -114,9 +115,6 @@ def model_training(args, model, dataloader_dict, optimizer, scheduler, device):
                     torch.save(model.state_dict(), 
                                os.path.join(args.save_path, f'nmt_model_{args.model_setting}_testing2.pt'))
                     best_val_loss = val_loss
-
-        # Learning rate scheduler setting
-        # scheduler.step()
 
     pd.DataFrame(total_train_loss_list).to_csv(os.path.join(args.save_path, f'train_loss_{args.src_baseline}_{args.trg_baseline}_{args.model_setting}2.csv'), index=False)
     pd.DataFrame(total_test_loss_list).to_csv(os.path.join(args.save_path, f'test_loss_{args.src_baseline}_{args.trg_baseline}_{args.model_setting}2.csv'), index=False)
