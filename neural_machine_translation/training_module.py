@@ -9,14 +9,14 @@ from torch.nn.utils import clip_grad_norm_
 
 from .utils import accuracy, CustomError, cal_loss
 
-def model_training(args, model, dataloader_dict, optimizer, scheduler, device):
+def model_training(args, model, dataloader_dict, start_epoch, optimizer, scheduler, device):
 
     best_val_loss = None
     total_train_loss_list = list()
     total_test_loss_list = list()
     freq = 0
 
-    for e in range(args.num_epoch):
+    for e in range(start_epoch, args.num_epoch):
         start_time_e = time.time()
         print(f'Model Fitting: [{e+1}/{args.num_epoch}]')
         for phase in ['train', 'valid']:
@@ -112,8 +112,12 @@ def model_training(args, model, dataloader_dict, optimizer, scheduler, device):
                     print("[!] saving model...")
                     if not os.path.exists(args.save_path):
                         os.mkdir(args.save_path)
-                    torch.save(model.state_dict(), 
-                               os.path.join(args.save_path, f'nmt_model_{args.model_setting}_testing2.pt'))
+                    torch.save({
+                        'epoch': e,
+                        'model': model.state_dict(),
+                        'optimizer': optimizer.state_dict(),
+                        'scheduler': scheduler.state_dict()
+                    }, os.path.join(args.save_path, f'nmt_model_{args.model_setting}_testing.pth.tar'))
                     best_val_loss = val_loss
 
     pd.DataFrame(total_train_loss_list).to_csv(os.path.join(args.save_path, f'train_loss_{args.src_baseline}_{args.trg_baseline}_{args.model_setting}2.csv'), index=False)

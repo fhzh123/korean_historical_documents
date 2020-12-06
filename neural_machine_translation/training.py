@@ -131,16 +131,6 @@ def training(args):
     else:
         raise Exception('Model error')
 
-    # if args.resume:
-    #     model_ner = NER_model(emb_mat=emb_mat, word2id=hj_word2id, pad_idx=args.pad_idx, bos_idx=args.bos_idx, eos_idx=args.eos_idx, max_len=args.max_len,
-    #                     d_model=args.d_model, d_embedding=args.d_embedding, n_head=args.n_head,
-    #                     dim_feedforward=args.dim_feedforward, n_layers=args.num_encoder_layer, dropout=args.dropout,
-    #                     device=device)
-    #     model_ner.load_state_dict(torch.load(os.path.join(args.save_path, 'ner_model_False.pt')))
-    #     model.transformer_encoder.load_state_dict(model_ner.transformer_encoder.state_dict())
-    #     for param in model.transformer_encoder.parameters():
-    #         param.requires_grad = False
-    # print("Total Parameters:", sum([p.nelement() for p in model.parameters()]))
     print(f"Total number of trainingsets  iterations - {len(dataset_dict['train'])}, {len(dataloader_dict['train'])}")
 
     # optimizer = Ralamb(params=filter(lambda p: p.requires_grad, model.parameters()),
@@ -152,9 +142,18 @@ def training(args):
     scheduler = WarmupLinearSchedule(optimizer, warmup_steps=args.n_warmup_epochs*len(dataloader_dict['train']), 
                                      t_total=len(dataloader_dict['train'])*args.num_epoch)
     model.to(device)
+    
+    # Model loading
+    start_epoch = 0
+    if args.resume:
+        checkpoint = torch.load(os.path.join(args.save_path, f'nmt_model_{args.model_setting}_testing.pth.tar'))
+        start_epoch = checkpoint['epoch'] + 1
+        model.load_state_dict(checkpoint['model'])
+        optimizer.load_state_dict(checkpoint['optimizer'])
+        scheduler.load_state_dict(checkpoint['scheduler'])
 
     #===================================#
     #=========Model Train Start=========#
     #===================================#
 
-    model_training(args, model, dataloader_dict, optimizer, scheduler, device)
+    model_training(args, model, dataloader_dict, start_epoch, optimizer, scheduler, device)
