@@ -75,9 +75,9 @@ def model_training(args, model, dataloader_dict, start_epoch, optimizer, schedul
                     # If phase train, then backward loss and step optimizer and scheduler
                     if phase == 'train':
                         loss.backward()
+                        clip_grad_norm_(model.parameters(), args.grad_clip)
                         optimizer.step()
                         scheduler.step()
-                        clip_grad_norm_(model.parameters(), args.grad_clip)
                         total_train_loss_list.append(loss.item())
                         # Print loss value only training
                         if freq == args.print_freq or i == 0 or i == len(dataloader_dict['train']):

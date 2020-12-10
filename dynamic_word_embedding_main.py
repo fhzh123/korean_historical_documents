@@ -15,7 +15,8 @@ def main(args):
         preprocessing(args)
 
     # Dynamic word embedding training
-    training(args)
+    if args.training:
+        training(args)
 
     # Time calculate
     print(f'Done! ; {round((time.time()-total_start_time)/60, 3)}min spend')
@@ -23,6 +24,7 @@ def main(args):
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description='DWE argparser')
     parser.add_argument('--preprocessing', action='store_true')
+    parser.add_argument('--training', action='store_true')
     # Language select
     parser.add_argument('--Hanja_dwe', type=bool, default=True, help='Hanja processing')
     parser.add_argument('--Korean_dwe', type=bool, default=True, help='Korean processing')

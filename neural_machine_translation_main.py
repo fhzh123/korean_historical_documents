@@ -11,12 +11,17 @@ def main(args):
     # Time setting
     total_start_time = time.time()
 
-    # NER preprocessing
+    # NMT preprocessing
     if args.preprocessing:
         preprocessing(args)
 
-    # NER main
-    training(args)
+    # NMT main
+    if args.training:
+        training(args)
+    
+    # NMT testing
+    if args.testing:
+        testing(args)
 
     # Time calculate
     print(f'Done! ; {round((time.time()-total_start_time)/60, 3)}min spend')
@@ -67,6 +72,8 @@ if __name__=='__main__':
     parser.add_argument('--emb_src_trg_weight_sharing', action='store_false', help='Do not use src emb weight sharing')
     parser.add_argument('--trg_emb_prj_weight_sharing', action='store_false', help='Do not use trg emb weight sharing')
     # Training setting
+    parser.add_argument('--training', action='store_true')
+    parser.add_argument('--testing', action='store_true')
     parser.add_argument('--min_len', type=int, default=4, help='Minimum Length of sentences; Default is 4')
     parser.add_argument('--smoothing_loss', action='store_true')
     parser.add_argument('--src_max_len', type=int, default=350, help='Max length of source sentence; Default is 350')
