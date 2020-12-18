@@ -88,13 +88,13 @@ def accuracy(output, target, topk=(1,)):
         res.append(correct_k.mul_(100.0 / batch_size))
     return res
 
-def cal_loss(pred, gold, trg_pad_idx, smoothing=False, eps=0.1):
+def cal_loss(pred, gold, trg_pad_idx, smoothing_eps=0.1):
     ''' Calculate cross entropy loss, apply label smoothing if needed. '''
-    if smoothing:
+    if smoothing_eps > 0:
         n_class = pred.size(1)
 
         one_hot = torch.zeros_like(pred).scatter(1, gold.view(-1, 1), 1)
-        one_hot = one_hot * (1 - eps) + (1 - one_hot) * eps / (n_class - 1)
+        one_hot = one_hot * (1 - smoothing_eps) + (1 - one_hot) * smoothing_eps / (n_class - 1)
         log_prb = F.log_softmax(pred, dim=1)
 
         non_pad_mask = gold.ne(trg_pad_idx)

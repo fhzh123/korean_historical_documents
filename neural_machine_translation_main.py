@@ -75,7 +75,7 @@ if __name__=='__main__':
     parser.add_argument('--training', action='store_true')
     parser.add_argument('--testing', action='store_true')
     parser.add_argument('--min_len', type=int, default=4, help='Minimum Length of sentences; Default is 4')
-    parser.add_argument('--smoothing_loss', action='store_true')
+    parser.add_argument('--smoothing_eps', type=float, default=0.1, help='Smoothing loss; Default is 0.1')
     parser.add_argument('--src_max_len', type=int, default=350, help='Max length of source sentence; Default is 350')
     parser.add_argument('--trg_max_len', type=int, default=350, help='Max length of target sentence; Default is 350')
     parser.add_argument('--num_epoch', type=int, default=10, help='Epoch count; Default is 10')

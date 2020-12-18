@@ -57,7 +57,7 @@ def model_training(args, model, dataloader_dict, start_epoch, optimizer, schedul
                         predicted = model(input_sequences, label_sequences)
                         loss = cal_loss(predicted, trg_sequences_target,
                                         trg_pad_idx=args.pad_idx,
-                                        smoothing=args.smoothing_loss)
+                                        smoothing_eps=args.smoothing_eps)
                         # predicted = predicted.view(-1, predicted.size(-1))
                         # loss = F.cross_entropy(predicted, trg_sequences_target, 
                         #                        ignore_index=model.pad_idx, reduction='mean')
